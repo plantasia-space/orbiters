@@ -1,0 +1,505 @@
+/**
+ * Orbiter accents for the kit waveform panel.
+ *
+ * The kit loop region + handles paint with design-lib `--primary` plus an opacity modifier
+ * (e.g. bg-primary/…). The orbiter sets `--primary` to a HEX (`--color1`), so the opacity-modified
+ * form resolves transparent → the loop band + in/out handles render invisible. Colour them with the
+ * orbiter's Color A (`--color1`, the same token the old Peaks loop overlay used) so they read on the
+ * cosmic background. (The waveform itself is coloured inline; the playhead already inherits white.)
+ */
+/* The original loops in Color C (`--color3`, fallback `--success` then the legacy green). The kit's
+   --primary-based fills resolve transparent against the orbiter's hex --primary, so paint them here. */
+.orbiters-react-ui__kit-waveform [data-slot="loop-region"] {
+  background: color-mix(in srgb, var(--color3, var(--success, #33ff41)) 30%, transparent);
+  border-color: var(--color3, var(--success, #33ff41));
+}
+
+/* Colour the thin VISUAL bar inside the handle (the 6px span), NOT the wide touch hit-area —
+   colouring the hit-area made the marker look thick. */
+.orbiters-react-ui__kit-waveform [data-slot="loop-region-handle"] > span {
+  background: var(--color3, var(--success, #33ff41));
+}
+
+/* The kit TimelineGrid colours its lines with `bg-border` (faint by design). In the orbiter that
+   resolves to the ink (--color1); bump beat + bar lines so the grid reads like the original
+   (which used --color1 @22% beat / 48% bar). `> span` = every line (beat baseline); the bar lines
+   carry `.bg-border/25` and read stronger. */
+.orbiters-react-ui__kit-waveform [data-slot="timeline-grid"] > span {
+  background-color: color-mix(in srgb, var(--color1, #ffffff) 20%, transparent);
+}
+.orbiters-react-ui__kit-waveform [data-slot="timeline-grid"] > span.bg-border\/25 {
+  background-color: color-mix(in srgb, var(--color1, #ffffff) 46%, transparent);
+}
+
+/* Markers: the loop-in pending anchor (Color C, during In→Out) + the grid origin ("Grid 1"). */
+.orbiters-react-ui__kit-waveform .kit-waveform__marker {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  pointer-events: none;
+}
+.orbiters-react-ui__kit-waveform .kit-waveform__marker--loop-in {
+  background: var(--color3, var(--success, #33ff41));
+  z-index: 16;
+}
+.orbiters-react-ui__kit-waveform .kit-waveform__marker--grid {
+  background: color-mix(in srgb, var(--color1, #ffffff) 70%, transparent);
+  z-index: 3;
+}
+/* Start cue — where playback begins. Set by pressing the waveform: stopped moves the playhead here
+   too; playing only moves this marker. A small play-direction flag at the top tells it apart from the
+   loop / seek markers. Below the playhead (z-index 20) so the live position wins when they overlap. */
+.orbiters-react-ui__kit-waveform .kit-waveform__marker--start-cue {
+  background: color-mix(in srgb, var(--color2, var(--color1, #ffffff)) 45%, transparent);
+  z-index: 15;
+}
+.orbiters-react-ui__kit-waveform .kit-waveform__marker--start-cue::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-bottom: 6px solid var(--color2, var(--color1, #ffffff)); /* points up, centered on the line */
+}
+.orbiters-react-ui__kit-waveform .kit-waveform__marker-label {
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  font: 9px/1.2 monospace;
+  white-space: nowrap;
+  color: var(--color1, #ffffff);
+  background: color-mix(in srgb, #000 45%, transparent);
+  padding: 1px 4px;
+  border-radius: 2px;
+}
+
+/* A pending quantized SEEK blinks a bar at the SET position so the wait is shown IN
+   THE ACTION (not only the top count). The count badge shows the beats remaining until the seek lands. */
+.orbiters-react-ui__kit-waveform .kit-waveform__marker--seek-pending {
+  background: var(--color3, var(--success, #33ff41));
+  width: 3px;
+  margin-left: -1.5px;
+  z-index: 18;
+  animation: kit-waveform-seek-blink 0.6s steps(1, end) infinite;
+}
+@keyframes kit-waveform-seek-blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0.15; }
+}
+.orbiters-react-ui__kit-waveform .kit-waveform__seek-count {
+  position: absolute;
+  top: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  font: 600 11px/1.2 monospace;
+  color: var(--color3, var(--success, #33ff41));
+  background: color-mix(in srgb, #000 55%, transparent);
+  padding: 1px 5px;
+  border-radius: 3px;
+  pointer-events: none;
+}
+
+/* ONE continuous glass panel for the zoom strip + waveform: the SURFACE owns the material + rounded
+   corners, so the zoom strip flows straight into the waveform as a single integrated surface (the strip
+   and the lane are transparent). Glass = the design-lib token (dark translucent in the orbiter's .dark)
+   + a blur, so it has contrast yet feels part of the cosmic scene. */
+.orbiters-react-ui__kit-waveform__surface {
+  display: flex;
+  flex-direction: column;
+  /* A consistent, fairly solid dark (NOT the faint --surface-glass, which read uneven over the bright
+     pyramid vs the dark sky). Still translucent + blurred so it feels like glass on the cosmic scene,
+     but opaque enough that the whole panel reads as one integrated surface everywhere. */
+  background: color-mix(in srgb, #000 62%, transparent);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  border-radius: 8px;
+  overflow: hidden;
+}
+/* The waveform lane + the zoom strip are transparent — the shared surface above paints them. */
+.orbiters-react-ui__kit-waveform__lane {
+  background: transparent;
+}
+/* The always-present horizontal scrollbar (space reserved so zoom doesn't shift the layout) — keep it
+   thin + subtle so the reserved gutter isn't visually heavy. */
+.orbiters-react-ui__kit-waveform__lane::-webkit-scrollbar {
+  height: 6px;
+}
+.orbiters-react-ui__kit-waveform__lane::-webkit-scrollbar-track {
+  background: transparent;
+}
+.orbiters-react-ui__kit-waveform__lane::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--color1, #ffffff) 28%, transparent);
+  border-radius: 3px;
+}
+
+/* Mini orbit loader — the boot loading screen's orbiting dot, button-sized: shown in the "Unlock
+   speed" button's icon slot while the full track downloads into the buffer, so the section itself
+   signals loading (no full-screen state). Center "planet" + one orbiting "moon", in currentColor. */
+.orbiters-react-ui__kit-waveform__unlock-orbit {
+  position: relative;
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.orbiters-react-ui__kit-waveform__unlock-orbit::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.45;
+}
+.orbiters-react-ui__kit-waveform__unlock-orbit::after {
+  content: '';
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: orbiters-kit-unlock-orbit 1.2s linear infinite;
+}
+@keyframes orbiters-kit-unlock-orbit {
+  0% { transform: rotate(0deg) translateX(7px) rotate(0deg); }
+  100% { transform: rotate(360deg) translateX(7px) rotate(-360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .orbiters-react-ui__kit-waveform__unlock-orbit::after { animation: none; opacity: 0.7; }
+}
+
+/* Small zoom control — the musical grid IS the zoom grid (drag it to zoom), so this is just a small
+   ± cluster pinned to the visible top-right of the surface (outside the scroller, so it never scrolls
+   away). Sits above the lane rows. */
+.orbiters-react-ui__kit-waveform__zoom-controls {
+  position: absolute;
+  top: 0;               /* top-aligned with the musical/tempo ruler row */
+  right: 6px;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  height: 16px;         /* same height as the musical ruler */
+  gap: 2px;
+}
+.orbiters-react-ui__kit-waveform__zoom-controls button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 16px;         /* match the ruler height so the buttons aren't taller than it */
+  padding: 0;
+  border: 0;
+  background: color-mix(in srgb, #000 40%, transparent);
+  border-radius: 3px;
+  color: color-mix(in srgb, var(--color1, #ffffff) 70%, transparent);
+  cursor: pointer;
+}
+.orbiters-react-ui__kit-waveform__zoom-controls button:hover {
+  color: var(--color1, #ffffff);
+  background: color-mix(in srgb, #000 55%, transparent);
+}
+.orbiters-react-ui__kit-waveform__zoom-controls svg {
+  width: 11px;
+  height: 11px;
+}
+
+/* Time readout BELOW the timeline — current position LEFT, total duration RIGHT (no slash bar
+   between them), small font, so it's a minimal time axis rather than a boxed readout. */
+.orbiters-react-ui__kit-waveform__readout-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 2px 8px 0;
+}
+.orbiters-react-ui__kit-waveform__time {
+  font: 10px/1.2 monospace;
+  color: var(--color1, #ffffff);
+  opacity: 0.7;
+}
+
+/* ── Ableton-style layered rows ──────────────────────────────────────────────────────────────
+   The lane scroller stacks: musical-grid (= zoom grid) → loop-select strip → seek-to strip →
+   waveform lane → time ruler (MM:SS, at the bottom of the waveform). All rows live inside ONE
+   TimelineViewport at lane width, so they share the seconds⇄px scale and scroll/zoom in lockstep. */
+
+/* Ruler text reads as the orbiter ink (--color1) over the cosmic background, like the grid lines —
+   the lib's --muted-foreground resolves off-palette against the orbiter's hex tokens. */
+.orbiters-react-ui__kit-waveform [data-slot="musical-ruler"] span:not(.bg-border\/40):not(.bg-border\/20),
+.orbiters-react-ui__kit-waveform [data-slot="timeline-ruler"] > div > span:first-child {
+  color: color-mix(in srgb, var(--color1, #ffffff) 70%, transparent);
+}
+/* Softer divider lines between rows than the lib's full --border ink. */
+.orbiters-react-ui__kit-waveform [data-slot="timeline-ruler"] {
+  border-bottom-color: color-mix(in srgb, var(--color1, #ffffff) 14%, transparent);
+}
+.orbiters-react-ui__kit-waveform [data-slot="musical-ruler"] span.bg-border\/40,
+.orbiters-react-ui__kit-waveform [data-slot="musical-ruler"] span.bg-border\/20 {
+  background-color: color-mix(in srgb, var(--color1, #ffffff) 34%, transparent);
+}
+
+/* musical grid (bar.beat) = the zoom grid. Drag it ↕ to zoom → a zoom cursor (not the old vertical
+   double-arrow). It IS the top of the ruler area, directly above the loop/seek strips + waveform. */
+.orbiters-react-ui__kit-waveform .orbiters-react-ui__kit-waveform__musical-zoom {
+  position: relative;
+  cursor: zoom-in;
+  touch-action: none;
+}
+.orbiters-react-ui__kit-waveform .orbiters-react-ui__kit-waveform__musical-ruler {
+  height: 16px;
+  pointer-events: none; /* the parent __musical-zoom owns the drag-to-zoom gesture */
+}
+/* Touch: a 16px-tall drag surface is a mouse-only target — a finger misses it or slips off before
+   the vertical zoom drag registers (the ± buttons were the only usable zoom). Finger-size the row;
+   the ruler stays its height, centered in the taller touch zone. */
+@media (pointer: coarse) {
+  .orbiters-react-ui__kit-waveform .orbiters-react-ui__kit-waveform__musical-zoom {
+    display: flex;
+    align-items: center;
+    height: 28px;
+  }
+  /* Keep the ± cluster centered on the (now taller) ruler row it sits on. */
+  .orbiters-react-ui__kit-waveform__zoom-controls {
+    height: 28px;
+  }
+}
+/* time row (MM:SS) — sits at the BOTTOM of the waveform (the time axis, as before). */
+.orbiters-react-ui__kit-waveform .orbiters-react-ui__kit-waveform__time-ruler {
+  height: 16px;
+}
+
+/* dedicated interaction strips: loop-select + seek-to. A bit taller now so they're comfortable hit
+   areas (icons need room). No overlap with each other or the waveform — each gesture has one home. */
+.orbiters-react-ui__kit-waveform .orbiters-react-ui__kit-waveform__strip {
+  position: relative;
+  height: 24px;
+  border-bottom: 1px solid color-mix(in srgb, var(--color1, #ffffff) 10%, transparent);
+}
+/* Both strips share a neutral, faint backdrop — the LOOP's colour lives on the selection band, not
+   on the strip background (per Bruna). */
+.orbiters-react-ui__kit-waveform .orbiters-react-ui__kit-waveform__loop-strip {
+  cursor: ew-resize;
+  background: color-mix(in srgb, var(--color1, #ffffff) 4%, transparent);
+  /* The loop strip OWNS its touches: without this, a touch-drag on the band (move) or on the empty
+     ruler (draw) also starts the lane's native pan — the browser then steals the gesture with a
+     pointercancel mid-drag. Scrolling stays available everywhere else on the lane. */
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+.orbiters-react-ui__kit-waveform .orbiters-react-ui__kit-waveform__seek-strip {
+  cursor: text;
+  background: color-mix(in srgb, var(--color1, #ffffff) 4%, transparent);
+}
+/* row icons (loop = same as the transport bar, seek = seek-to) at the left of each strip. Non-
+   interactive so the click/drag passes through to the strip's ruler beneath. Neutral ink — the
+   green is reserved for the selection band. */
+.orbiters-react-ui__kit-waveform .orbiters-react-ui__kit-waveform__strip-icon {
+  /* Sticky, not absolute: the strip spans the whole (wide) lane, so absolute left:5px sits at
+     timeline second 0 and scrolls away with the content. Sticky pins the icon to the visible left
+     edge of the scroller while the strip scrolls beneath it (the rulers/band are absolute siblings,
+     so the icon is the strip's only in-flow child). */
+  position: sticky;
+  left: 5px;
+  height: 100%;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  pointer-events: none;
+  color: color-mix(in srgb, var(--color1, #ffffff) 60%, transparent);
+}
+.orbiters-react-ui__kit-waveform .orbiters-react-ui__kit-waveform__strip-icon svg {
+  width: 13px;
+  height: 13px;
+}
+/* the loop band shown IN the loop strip (move-only — drag it to reposition the loop). It's a
+   LoopRegion, so it inherits the green selection colour; just inset it in the thin strip. */
+.orbiters-react-ui__kit-waveform .orbiters-react-ui__kit-waveform__loop-strip-band {
+  top: 3px;
+  bottom: 3px;
+}
+/* Loop brace: the In/Out edge handles rendered as inward-facing arrows (per Bruna's reference). These
+   are the lib LoopRegion's real edge handles, so they are DRAGGABLE — the grab zone carries an
+   ew-resize (double-arrow) cursor from the lib and dragging resizes the loop opening/closing marker.
+   We restyle the lib's default bar into an inward-pointing triangle, accent-coloured to match. */
+.orbiters-react-ui__kit-waveform .orbiters-react-ui__kit-waveform__loop-strip-band [data-slot="loop-region-handle"] > span {
+  width: 0;
+  height: 0;
+  border-radius: 0;
+  background: transparent;
+  border-top: 6px solid transparent;
+  border-bottom: 6px solid transparent;
+}
+.orbiters-react-ui__kit-waveform .orbiters-react-ui__kit-waveform__loop-strip-band [data-slot="loop-region-handle"][data-edge="start"] > span {
+  border-left: 7px solid var(--primary, var(--color1, #ffffff)); /* points right → into the loop */
+}
+.orbiters-react-ui__kit-waveform .orbiters-react-ui__kit-waveform__loop-strip-band [data-slot="loop-region-handle"][data-edge="end"] > span {
+  border-right: 7px solid var(--primary, var(--color1, #ffffff)); /* points left → into the loop */
+}
+
+/* play-start cursor surface — the waveform body is a click target that sets where playback resumes
+   from (a plain seek; the grid is NOT touched). Full-height; its z-index (1) is below the loop band
+   (z-10) / playhead (z-20) / diamond (z-30), so those win their gestures on overlap. I-beam cursor
+   signals "click to set the position". */
+.orbiters-react-ui__kit-waveform .orbiters-react-ui__kit-waveform__cursor-surface {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  cursor: text;
+}
+
+/* Loop band OVER the waveform: it's display-only for its BODY — clicks pass through to the play
+   cursor beneath (the waveform functions the same whether or not a loop sits there). The ONLY
+   grabbable exceptions are the In/Out handles. Moving the loop lives in the loop strip up top. */
+.orbiters-react-ui__kit-waveform .orbiters-react-ui__kit-waveform__wave-loop {
+  pointer-events: none;
+  cursor: default;
+}
+.orbiters-react-ui__kit-waveform .orbiters-react-ui__kit-waveform__wave-loop [data-slot="loop-region-handle"] {
+  pointer-events: auto;
+}
+
+/* More breathing room between the waveform and the grid/loop buttons below it. */
+.orbiters-react-ui__kit-waveform > .orbiters-react-ui__playback-chrome {
+  margin-top: 12px;
+}
+
+/* ── icon-first rail ─────────────────────────────────────────────────────────────────────────
+   In/Out/Snap/Warp/subdivision-expand are the shared `CornerButton` (`plantasia.space-design/react`)
+   — the SAME ghost icon-button primitive Transport.tsx already uses for Play/Stop/Record/Loop — not
+   a hand-rolled button. It brings its own ink/hover/pressed/flash chrome (`corner-button.tsx`,
+   `--corner-active`/`--foreground`), which DOES resolve correctly here: this panel is not actually
+   portaled (only the Studio edit drawer is; the play shell containing PlaybackPanel/KitWaveformPanel
+   never is — verified against `StudioShell.tsx`/`OrbitersUI.tsx`), so no CSS override is needed for
+   it beyond the rail's own spacing/gap below.
+
+   Grid's Param and BPM's ParameterizedParam are NOT CornerButtons (they're drag/wheel-adjustable
+   number fields, not click actions) — `.orbiters-react-ui__playback-item` is their shared icon/value/
+   label vertical stack, replacing the old inline `.orbiters-react-ui__playback-bpm` layout so Grid's
+   diamond sits ABOVE its value like every other control, matching the mock. */
+.orbiters-react-ui__playback-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  /* Mirror the CornerButton stacked geometry (min-w-16 gap-1 px-2.5 py-1.5) so Grid/BPM sit on the
+     same grid as the icon buttons: top padding lines their first row up with the buttons' icons under
+     the row's top-alignment, and the shared min-width evens the spacing. No bottom padding — the row
+     is top-aligned, so a taller item (Grid's 3-tier readout) simply extends downward, per the mock. */
+  gap: 0.25rem;
+  min-width: 4rem;
+  padding: 0.375rem 0.625rem 0;
+}
+.orbiters-react-ui__playback-item-icon {
+  display: flex;
+  color: color-mix(in srgb, var(--color1, var(--primary)) 70%, transparent);
+}
+/* Downbeat's value row: the small diamond glyph sits inline to the LEFT of the number, both on the
+   same 18px line as every other item's icon/value — so Downbeat reads as "[◇ 0.00s] / Downbeat",
+   structurally identical to BPM's "[130.00] / BPM". */
+.orbiters-react-ui__playback-item-value {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  min-height: 18px;
+}
+.orbiters-react-ui__playback-item-label {
+  font-size: clamp(0.5rem, calc(0.9 * var(--orb-vp-w)), 0.62rem);
+  color: color-mix(in srgb, var(--color1, var(--primary)) 70%, transparent);
+  letter-spacing: 0.04em;
+}
+/* The Grid/BPM number (a param-display) inherits the global `color: var(--primary)`, which goes
+   black in the bottom-sheet drawer (a DIFFERENT portal — the Studio edit panel's — that other
+   `.orbiters-react-ui__playback-item` instances could in principle render inside) — pin it to the
+   root-level orbiter ink so it never depends on which scope it resolves in. */
+.orbiters-react-ui__playback-item [data-slot="param-display"] {
+  color: var(--color1, var(--primary));
+  /* Seat the number in an 18px-tall line — the same height as the CornerButton icon row and Grid's
+     diamond — so BPM's value (its top row) aligns with the neighbouring icons and every label lands on
+     a consistent baseline. */
+  display: flex;
+  align-items: center;
+  min-height: 18px;
+  /* Lighter mono readout (~13px) so the numbers sit in harmony with the 18px icons instead of the
+     heavier 16px default — matches the design mock's number weight in the rail. */
+  font-size: clamp(0.72rem, calc(1.5 * var(--orb-vp-w)), 0.82rem);
+}
+
+/* Mobile playback rail: reclaim a little vertical space without changing the desktop rhythm.
+   Trim the stacked button chrome and the BPM/Downbeat stacks slightly so the waveform gets a bit
+   more room, but keep labels readable and touch targets still comfortable. */
+.orbiters-react-ui__playback-row[data-mobile] {
+  gap: 0.16rem;
+}
+.orbiters-react-ui__playback-row[data-mobile] [data-slot="corner-button"] {
+  min-width: 3.45rem;
+  gap: 0.2rem;
+  padding: 0.24rem 0.42rem 0.18rem;
+  font-size: 0.56rem;
+}
+.orbiters-react-ui__playback-row[data-mobile] [data-slot="corner-button"] svg {
+  width: 15px;
+  height: 15px;
+}
+.orbiters-react-ui__playback-row[data-mobile] .orbiters-react-ui__playback-item {
+  gap: 0.18rem;
+  min-width: 3.45rem;
+  padding: 0.24rem 0.42rem 0;
+}
+.orbiters-react-ui__playback-row[data-mobile] .orbiters-react-ui__playback-item-value,
+.orbiters-react-ui__playback-row[data-mobile] .orbiters-react-ui__playback-item [data-slot="param-display"] {
+  min-height: 15px;
+}
+.orbiters-react-ui__playback-row[data-mobile] .orbiters-react-ui__playback-item [data-slot="param-display"] {
+  font-size: 0.74rem;
+}
+.orbiters-react-ui__playback-row[data-mobile] .orbiters-react-ui__playback-item-label {
+  font-size: 0.54rem;
+}
+
+/* The labels stay visible at every size, including mobile and short multi-orbiter tiles — they name
+   each control (Downbeat / In / Out / Auto / Warp / BPM), and hiding them left the rail ambiguous
+   (Bruna: keep the labels). If a very short tile ever needs vertical room, reclaim it by shrinking the
+   rail, not by dropping the names. */
+
+/* Mobile loop-size carousel — this is the control you actually tap to set the loop, so it's the
+   IMPORTANT one: comfortable ~44px tap targets and a readable value. Conversely the expand/collapse
+   toggle that merely opens it shrinks out of the way. (Bruna: the carousel matters more than the
+   button that opens it — today the toggle was big and the values were tiny, which is backwards.) */
+.orbiters-react-ui__playback-sizes[data-mobile] {
+  flex-wrap: nowrap;
+  width: 100%;
+  gap: 0.3rem;
+}
+/* The paged window of loop values spreads across the FULL row width (pager arrow · values · pager
+   arrow), so the previously-unused left/right space is used instead of wrapping onto a second row.
+   Each value flexes to an even share and still keeps a ~44px-tall tap target. */
+.orbiters-react-ui__playback-sizes[data-mobile] .orbiters-react-ui__playback-size {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 2.35rem;
+  padding: 0.42rem 0.12rem;
+  font-size: 0.82rem;
+  letter-spacing: 0.01em;
+  line-height: 1.05;
+  border-bottom-width: 2px;
+}
+/* Pager arrows stay compact at the ends — they don't flex, the values get the room. */
+.orbiters-react-ui__playback-sizes[data-mobile] [data-slot="corner-button"] {
+  flex: 0 0 auto;
+}
+.orbiters-react-ui__subdiv-toggle[data-mobile] {
+  min-width: 0;
+  padding-left: 0.4rem;
+  padding-right: 0.4rem;
+}
+.orbiters-react-ui__subdiv-toggle[data-mobile] svg {
+  width: 15px;
+  height: 15px;
+}

@@ -1,0 +1,218 @@
+.row {
+  display: flex;
+  flex-direction: row;
+}
+
+.col-1 {
+  flex: 0 0 auto;
+  width: 8.33333333%;
+}
+
+.dropdown-menu {
+  --ui-dropdown-item-gap: 0.5rem;
+  --ui-dropdown-menu-icon-slot-size: clamp(1.3rem, 2.6vmin, 1.56rem);
+  --ui-dropdown-menu-icon-wide-scale: 0.88;
+  --ui-dropdown-menu-icon-square-scale: 0.96;
+  --ui-dropdown-menu-label-size: clamp(0.75rem, 1.3vmin, 0.95rem);
+}
+
+.dropdown-menu {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  left: 0;
+  display: none;
+  z-index: 1000;
+  list-style: none;
+  padding: 0.35rem 0;
+  margin: 0;
+  min-width: clamp(9rem, 18vw, 13rem);
+}
+
+.dropdown-menu.show {
+  display: block;
+}
+
+.dropdown-menu .dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+.dropdown-menu .menu-icon-slot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--ui-dropdown-menu-icon-slot-size);
+  height: var(--ui-dropdown-menu-icon-slot-size);
+  flex: 0 0 var(--ui-dropdown-menu-icon-slot-size);
+  margin-right: var(--ui-dropdown-item-gap);
+}
+
+.dropdown-menu .menu-item-label {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--ui-dropdown-menu-icon-slot-size);
+  line-height: 1;
+  font-size: var(--ui-dropdown-menu-label-size);
+}
+
+.dropdown-menu .menu-item-icon,
+.dropdown-menu .menu-icon-slot .menu-icon-svg {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  object-position: center;
+}
+
+/* Prevent legacy <img class="menu-item-icon"> spacing from stacking with slot spacing. */
+.dropdown-menu .menu-icon-slot .menu-item-icon {
+  margin-right: 0 !important;
+}
+
+.dropdown-menu .dropdown-item > .menu-item-icon,
+.dropdown-menu .dropdown-item > .menu-icon-svg {
+  width: var(--ui-dropdown-menu-icon-slot-size) !important;
+  height: var(--ui-dropdown-menu-icon-slot-size) !important;
+  flex: 0 0 var(--ui-dropdown-menu-icon-slot-size);
+  margin-right: var(--ui-dropdown-item-gap);
+}
+
+.dropdown-menu .menu-icon-slot .menu-icon-svg.menu-icon-svg--wide {
+  transform: scale(var(--ui-dropdown-menu-icon-wide-scale));
+  transform-origin: center;
+}
+
+.dropdown-menu .menu-icon-slot .menu-icon-svg.menu-icon-svg--square {
+  transform: scale(var(--ui-dropdown-menu-icon-square-scale));
+  transform-origin: center;
+}
+
+.dropdown-menu-end {
+  right: 0;
+  left: auto;
+}
+
+.dropdown,
+.dropup,
+.dropup-center,
+.dropup-start,
+.dropup-end {
+  position: relative;
+}
+
+.dropup .dropdown-menu,
+.dropup-center .dropdown-menu,
+.dropup-start .dropdown-menu,
+.dropup-end .dropdown-menu {
+  top: auto;
+  bottom: calc(100% + 0.35rem);
+}
+
+.dropup-center .dropdown-menu {
+  left: 0;
+  right: auto;
+  transform: none;
+}
+
+.modal {
+  display: none;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+}
+
+.modal.show,
+.modal.active {
+  display: flex;
+}
+
+.modal-dialog {
+  position: relative;
+  width: min(90vw, 32rem);
+  margin: 0;
+}
+
+.modal-dialog-centered {
+  min-height: 0;
+  display: block;
+}
+
+.modal-content {
+  position: relative;
+  background: #fff;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1rem 1rem 0;
+}
+
+.modal-title {
+  margin: 0;
+}
+
+.modal-body {
+  padding: 1rem;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding: 0 1rem 1rem;
+}
+
+.btn-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: none;
+  background: transparent;
+  color: #000;
+  cursor: pointer;
+}
+
+.btn-close::before {
+  content: '×';
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1050;
+}
+
+.list-group-item {
+  display: block;
+  width: 100%;
+}
+
+.list-group-item-action {
+  cursor: pointer;
+}
+
+/* Mechanics — the visual surface is the design library's `tooltipContentClass` (applied by
+ * uiCoreShim's Tooltip node), so a tooltip reads identically to the rest of the platform.
+ * EXCEPTION: the box metrics (padding, radius) are restated below with the library's own values,
+ * because the app's unlayered universal reset zeroes the lib's layered `px-3 py-1.5 rounded-md`
+ * utilities — unlayered app CSS always wins on a shared property. Keep them in step with
+ * `tooltipContentClass`; everything else (background, ink, font) must come from the lib classes. */
+.orbiters-tooltip {
+  position: fixed;
+  z-index: 2000;
+  max-width: min(18rem, 80vw);
+  pointer-events: none;
+  padding: 0.375rem 0.75rem;
+  border-radius: calc(var(--radius, 0.625rem) - 2px);
+}

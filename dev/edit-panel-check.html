@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<!-- `dark` class so the design-library tokens resolve to the dark palette (the edit panel is a
+     dark overlay). It's on <html> so Radix Select's body-portalled dropdown is themed too. -->
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>orbiters · edit-panel React slice check</title>
+  <style>
+    body { margin: 0; font-family: system-ui, sans-serif; background: #0b0b0f; color: #eee; }
+  </style>
+</head>
+<body>
+  <!-- Dev-only, isolated harness for the React edit-panel controls (surface #1).
+       Not part of the app boot; verifies the React control fires the seam callback correctly. -->
+  <div id="edit-panel-root"></div>
+  <script type="module" src="./edit-panel-check.tsx"></script>
+</body>
+</html>

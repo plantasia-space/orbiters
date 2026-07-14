@@ -1,0 +1,22 @@
+/* Multi-stage Studio — hide the mobile scroll stack's scrollbar (the stray white bar). The
+   vertical scroll + snap stays; only the visible scrollbar thumb is suppressed. */
+.multi-stage-studio-scroll {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* legacy Edge */
+}
+.multi-stage-studio-scroll::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none; /* WebKit / Blink */
+}
+
+/* The dock follows the USER chrome theme — `applyStudioChromeTheme` (attached to the dock via
+   `ref={chromeRef}` in MultiStageStudio) writes the resolved preset's `--foreground` INLINE on the bar,
+   which wins over this rule. The dock sits inside the studio's `.dark` scope, which ALSO sets `--foreground`
+   white, so this rule is a redundant belt-and-suspenders guarantee that the CornerButton ink + corner
+   brackets read light-on-dark on the glass surface if neither the preset nor `.dark` applies. A real CSS
+   rule (not inline) because the lib component's nested `style` typing rejects a custom property; the applier
+   writes it inline where it can. */
+.multi-stage-studio-dock {
+  --foreground: #ffffff;
+}

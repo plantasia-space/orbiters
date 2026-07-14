@@ -1,0 +1,66 @@
+{
+  "name": "orbiters",
+  "description": "Regenerative music playground for Plantasia Space worlds: orbiter playback, effects rack, sensors/LFO input, and multiplayer sync, rendered with Three.js and Tone.js.",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "version": "2.0.0",
+  "type": "module",
+  "files": [
+    "src/**/*"
+  ],
+  "exports": {
+    "./multi": {
+      "types": "./src/multi/index.d.ts",
+      "default": "./src/multi/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "dev": "vite",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "build": "vite build",
+    "lint": "eslint .",
+    "docs": "jsdoc -c jsdoc.conf.json",
+    "docs:md": "jsdoc2md --files src/**/*.js > entangled-worlds-reference/entangled-worlds-reference.md",
+    "docs:docusaurus": "node scripts/generate-docs.js",
+    "lint:strict": "eslint . --max-warnings=0",
+    "lint:fallback": "node scripts/lint.js"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^4.7.0",
+    "@vitest/coverage-v8": "^4.1.7",
+    "clean-jsdoc-theme": "^4.3.0",
+    "esbuild": "^0.25.5",
+    "eslint": "^10.0.0",
+    "globals": "^17.3.0",
+    "jsdoc": "^4.0.4",
+    "jsdoc-to-markdown": "^9.1.1",
+    "jsdom": "^29.1.1",
+    "remark-breaks": "^4.0.0",
+    "typescript": "^5.9.3",
+    "vite": "^6.3.5",
+    "vite-plugin-restart": "^0.4.1",
+    "vitest": "^4.1.7"
+  },
+  "dependencies": {
+    "entangled-worlds-orbiters-shared": "^2.4.1",
+    "i18next": "^25.4.0",
+    "lucide-react": "^1.18.0",
+    "plantasia.space-design": "^0.22.10",
+    "qrcode": "^1.5.4",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "signalsmith-stretch": "^1.3.2",
+    "three": "^0.166.1",
+    "three-stdlib": "^2.34.0",
+    "tone": "^15.1.22"
+  },
+  "engines": {
+    "node": ">=20.19.0"
+  }
+}

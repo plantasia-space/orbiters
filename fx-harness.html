@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Effect visuals harness</title>
+    <style>
+      :root { color-scheme: dark; }
+      body {
+        font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        background: #0e1014; color: #e6e8ec; margin: 0; padding: 24px; max-width: 720px;
+      }
+      h1 { font-size: 18px; margin: 0 0 8px; }
+      .muted { color: #8b9099; }
+      .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 12px 0; }
+      button {
+        background: #232834; color: #e6e8ec; border: 1px solid #39414f; border-radius: 6px;
+        padding: 8px 14px; cursor: pointer; font: inherit;
+      }
+      button:hover:not(:disabled) { background: #2c3340; }
+      button:disabled { opacity: 0.4; cursor: default; }
+      button.tab.active { background: #3a4455; border-color: #5b667a; }
+      .module { display: grid; grid-template-columns: 110px 1fr 48px; gap: 12px; align-items: center; margin: 10px 0; }
+      .module input[type="range"] { width: 100%; }
+      .module .value { text-align: right; color: #8b9099; }
+      .module .name { font-weight: 600; }
+      .desc { grid-column: 2 / 4; color: #8b9099; font-size: 12px; margin-top: -6px; }
+      label.toggle { display: inline-flex; gap: 6px; align-items: center; color: #8b9099; }
+      pre { background: #181b22; border: 1px solid #262b35; border-radius: 6px; padding: 10px; font-size: 12px; overflow-x: auto; }
+    </style>
+  </head>
+  <body>
+    <h1>Effect visuals harness</h1>
+    <p class="muted">
+      Dev-only rig for the fixed sound→visual vocabulary: one tab per effect group, each
+      driving real audio and the group's visual response on the shared stage above the
+      controls. Load a local audio file, start the dry loop, then play with a group.
+    </p>
+    <div id="app"></div>
+    <script type="module" src="/src/fx-harness/harness.js"></script>
+  </body>
+</html>

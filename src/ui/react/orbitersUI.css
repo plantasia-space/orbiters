@@ -1,0 +1,2507 @@
+/**
+ * Orbiters React-UI shell — overlay / z-index / pointer-events contract
+ * (strategy §4). The React root mirrors the legacy `.ui-overlay`: it sits over
+ * the 3D canvas, is pointer-transparent so drags reach `#canvas3D`, and its
+ * controls opt BACK IN to pointer events.
+ *
+ * Loaded only by the `?ui=react` shell (imported from mountOrbitersUI). The
+ * design-lib's compiled Tailwind (`plantasia.space-design/styles.css`) supplies
+ * the control classes; this file owns ONLY the orbiters-side overlay geometry
+ * and the ported sizing var the LeftRail consumes — no hand-authored utilities.
+ */
+
+/* z-index tokens (strategy §4): canvas < UI < dropdowns < MIDI overlays < modals.
+   The legacy overlay is z-index:2; the React shell sits just above it (3) while
+   the compatibility shell is up, so React regions render over the WAC chrome
+   they're replacing. Dropdowns/overlays/modals from the lib portal to body and
+   carry their own (higher) z-index. */
+:root {
+  --orbiters-react-ui-z: 3;
+  /* MIDI-learn scope colors (moved from style.css so they resolve in the de-iframed embed,
+     which does not load style.css). Green = orbiter/track-owned, blue = collection-owned;
+     these back the learn overlays, the CH/CC badges, and the load-dialog scope tints. */
+  --highlight-color: #02ff02;
+  --midi-collection-color: #38b6ff;
+  --mapped-color: #9aff9a;
+}
+
+/* ── Container-relative responsive system: the play UI measures its OWN box ────
+   The play UI's whole responsive system — the continuous `clamp()` scaling AND the
+   discrete breakpoints (the `@container` blocks further down) — keys off the box the UI
+   occupies, so a single-orbiter window and a multi-orbiter TILE of the same size render
+   identically. Two pieces make that work:
+
+   1. A size query container wraps `.orbiters-react-ui` in both modes:
+        · single: the mount host `#orbiters-react-ui-root`
+        · multi:  each tile cell `.multi-orbiter-cell`
+      `.orbiters-react-ui` then points the viewport-unit aliases at container units
+      (`1cqmin/1cqw/1cqh`), so every sizing rule written as `calc(N * var(--orb-vp-*))`
+      re-bases onto that box automatically — one lever, no per-context size re-declaration.
+
+   2. The discrete `@media (max-width/height)` breakpoints are expressed as `@container`
+      queries, so they trip on the box size too (window in single, tile in multi).
+
+   The `:root` aliases below are the fallback for body-portalled surfaces (ActionButtonGroup
+   menus, dialogs, drawers): they render OUTSIDE any container, have no `.orbiters-react-ui`
+   ancestor, and must stay window-relative — so `calc(… * var(--orb-vp-*))` there resolves
+   against the window and never against nothing. */
+:root {
+  --orb-vp-min: 1vmin;
+  --orb-vp-w: 1vw;
+  --orb-vp-h: 1vh;
+}
+
+#orbiters-react-ui-root,
+.multi-orbiter-cell {
+  container-type: size;
+}
+/* The single-orbiter mount host was a 0-height wrapper relying on the inner
+   `position:absolute; inset:0` `.orbiters-react-ui` to fill the viewport. Give it a real
+   box (so it can be a size container) and the play z-index, because `container-type`'s
+   layout containment makes it a stacking context that would otherwise trap the inner UI
+   below the canvas. Exact-id match, so multi hosts (`…-<voiceId>`) are untouched — those
+   use their cell as the container. */
+#orbiters-react-ui-root {
+  position: absolute;
+  inset: 0;
+  z-index: var(--orbiters-react-ui-z);
+  /* Full-bleed box over the canvas: it must NOT eat camera drag. The play UI opts back in per
+     interactive element (`.orbiters-react-ui` layer is pointer-events:none, buttons/panels :auto),
+     so empty areas fall through to the orbiter canvas. (Multi cells do this via `.multi-orbiter-cell`.) */
+  pointer-events: none;
+}
+.orbiters-react-ui {
+  --orb-vp-min: 1cqmin;
+  --orb-vp-w: 1cqw;
+  --orb-vp-h: 1cqh;
+}
+
+/* ── Theme bridge: orbiter release design → design-lib token contract ────────
+   The release payload's per-dimension design (colorPrimary / colorSecondary /
+   roundedCorners / fontFamily) is already resolved and written to
+   documentElement by the LEGACY `applyDesignSettings` (src/ui/designManager.js)
+   on bootstrap AND on every dimension switch, as `--color1` / `--color2` /
+   `--orbiters-rounded-corners` / `--orbiters-font-family`. Those names are the
+   ORBITERS contract; the design-lib React components read a DIFFERENT contract —
+   the brand primitives `--xplorer-col-1` / `--xplorer-col-2` (tokens.css), from
+   which `--primary` / `--secondary` / `--border` derive, plus `--radius` and
+   `--font-sans`. So we alias one onto the other here.
+
+   Aliasing (not copying via JS) means the lib re-resolves automatically when the
+   legacy code re-applies the design on a dimension switch — no subscription, no
+   churn (AGENTS.md: cheap, event-driven). The bridge is intentionally scoped to
+   `.orbiters-react-ui`, not `:root`: orbiter entity theme belongs to the orbiter/play
+   surface only. The Studio inspector chrome is a separate app surface and gets its
+   own user chrome theme via `studioChromeTheme.js`.
+
+   ALSO applied to `[data-slot="action-button-group-content"]`: the play-UI menus
+   (HeaderBar info/"more", InteractionMenu, Transport, CosmicLFO) are Radix portals
+   that mount on <body>, OUTSIDE `.orbiters-react-ui`, so the `.orbiters-react-ui`
+   scope alone would leave them on the lib default (white) instead of the orbiter
+   ink. ActionButtonGroup is play-UI-EXCLUSIVE; Studio chrome portals use their own
+   themed containers, so theming this slot as orbiter cannot leak into the chrome.
+
+   Brand-primitive mapping: orbiter colorPrimary → `--color1` → `--xplorer-col-1`
+   (the ink/accent), colorSecondary → `--color2` → `--xplorer-col-2`. Combined
+   with the `.dark` class the shell carries (orbiters is a light-on-dark UI:
+   black canvas, white-ish ink), the lib resolves `--primary = --xplorer-col-1 =
+   colorPrimary` and keeps `--background` black / `--foreground` white — a
+   faithful mirror of the legacy look.
+
+   NOTE: this bridge is deliberately NOT applied to `.orbiters-portal-scope` (the per-voice
+   portal container `PortalContainerProvider` mounts on <body>). That container carries only the raw
+   orbiter tokens (`--color1/2/3`/font/radius, set inline) + `.dark` — exactly what `documentElement`
+   carried in the standalone app — so it reproduces standalone behaviour per-voice. Portalled surfaces
+   that WANT the ink remap match their own selectors below (`action-button-group-content` /
+   `popover-content`) and get it while reading `--color1` from the container. The keypad Dialog is
+   MONOCHROME by intent (numericKeyboard.css): it must inherit the container's NEUTRAL
+   `--popover-foreground` (white, from `.dark`), NOT `--color1` — so the container must stay off this
+   bridge or the numerals would tint to the orbiter accent. */
+.orbiters-react-ui,
+.orbiters-portal-scope [data-slot="action-button-group-content"],
+.orbiters-portal-scope [data-slot="popover-content"],
+.orbiters-portal-scope [data-slot="dropdown-menu-content"],
+.orbiters-portal-scope [data-slot="dropdown-menu-sub-content"] {
+  --xplorer-col-1: var(--color1, #ffffff);
+  --xplorer-col-2: var(--color2, #000000);
+  --radius: var(--orbiters-rounded-corners, 0px);
+  --font-sans: var(--orbiters-font-family, 'Lato', sans-serif);
+  /* SYSTEMIC INK: the legacy UI tints ALL text/icons with color1 (the orbiter
+     primary). The lib's dark `--foreground` / `--muted-foreground` are WHITE, and
+     many components read those tokens (HeaderShell title, arrow Param value display,
+     ActionButtonGroup) — so they rendered white instead of pink. Remap both to the
+     orbiter ink so EVERYTHING is pink by default. The active-state HIGHLIGHT
+     (`--success`: active dimension, loop, active panel, stop, SYNC) is now the orbiter's
+     Color C (`--color3`, default green) so it is theme-controlled like Color A/B — every
+     play-UI `var(--success)` resolves to it, including the ActionButtonGroup active token.
+     Loaded after the lib's tokens, so this wins over the `.dark` defaults. */
+  --foreground: var(--color1, #ffffff);
+  --muted-foreground: var(--color1, #ffffff);
+  /* Dropdown/menu surfaces (ActionButtonGroup — the "more", info/monitor, interaction, cosmic
+     menus) are POPOVERS: their item TEXT reads `--popover-foreground` while the icons use
+     `currentColor` (= --foreground). The lib default leaves `--popover-foreground` white, so menu
+     text rendered white while icons followed the orbiter ink — inconsistent. Remap it to the same
+     orbiter ink so every dropdown's text + icons match (one common, theme-driven look). */
+  --popover-foreground: var(--color1, #ffffff);
+  --primary: var(--xplorer-col-1);
+  --secondary: var(--xplorer-col-2);
+  /* Default Color C (selected/active "success") — the long-standing green, used when the orbiter sets
+     no `--color3`. ONE literal here, mirrored in JS as `DEFAULT_COLOR_C` (designUtils.js) — keep in sync. */
+  --orb-default-color3: #33ff41;
+  --success: var(--color3, var(--orb-default-color3));
+  --abg-active: var(--color3, var(--orb-default-color3));
+  --border: var(--xplorer-col-1);
+  --border-2: var(--xplorer-col-1);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-border: var(--border);
+  --color-border-2: var(--border-2);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+}
+
+/* The per-voice portal container is a THEME carrier, not a layout box. `display:contents` drops its
+   own box (so it never affects the page or clips its portalled children) while still passing its
+   tokens down to the Radix content mounted inside it: the orbiter vars (`--color1/2/3`/font/radius,
+   set INLINE by PortalContainerProvider) plus the `.dark` neutral palette (from its own `.dark`
+   class). Deliberately NOT on the token bridge above — see that block's note. Fixed dialogs resolve
+   against the viewport, exactly as when they portalled straight to <body>. */
+.orbiters-portal-scope {
+  display: contents;
+}
+
+/* ── Fluid type scale ───────────────────────────────────────────────────────
+   The lib's `--text-*` tokens (Tailwind defaults, baked into the design-lib's
+   compiled CSS) are FIXED rem — identical at 414px and 4k — while every orbiter
+   control already scales (`--orb-control-size`/`--orb-action-size` use vmin/vw
+   clamps). Text was the odd one out: too big on phones, too small on large
+   displays. Redefine the few scale STEPS we use as `clamp()` so the whole type
+   system goes fluid in one place — NOT per-element custom sizes (Bruna rejected
+   those). Everything that reads `var(--text-*)` follows: lib components (buttons,
+   dropdowns, dialogs, bottom bar) AND the orbiter wrapper tokens below
+   (`--orb-panel-text` = base, `--orb-knob-text` = 2xl).
+
+   vmin-based (the min viewport edge), matching the controls, so ultrawide
+   screens don't over-grow text. Tuned so the MAX ≈ the old fixed value (≈no
+   regression on a normal desktop) and the MIN shrinks one notch for phones; the
+   step ordering (xs<sm<base<lg<2xl) holds at every viewport.
+
+   Same dual selector as the theme bridge above: `.orbiters-react-ui` covers the
+   in-tree play UI; `[data-slot="action-button-group-content"]` covers the lib's
+   play-UI menus (HeaderBar info/"more", Interaction, Transport, CosmicLFO), which
+   are Radix portals mounted on <body> OUTSIDE the orbiters scope and would
+   otherwise stay on the lib's fixed sizes. */
+.orbiters-react-ui,
+.orbiters-portal-scope [data-slot="action-button-group-content"],
+.orbiters-portal-scope [data-slot="popover-content"],
+.orbiters-portal-scope [data-slot="dropdown-menu-content"],
+.orbiters-portal-scope [data-slot="dropdown-menu-sub-content"] {
+  --text-xs: clamp(0.7rem, calc(1.1 * var(--orb-vp-min)), 0.85rem);    /* was .75rem (12px) */
+  --text-sm: clamp(0.8rem, calc(1.35 * var(--orb-vp-min)), 1rem);      /* was .875rem (14px) */
+  --text-base: clamp(0.9rem, calc(1.6 * var(--orb-vp-min)), 1.15rem);  /* was 1rem (16px) */
+  --text-lg: clamp(1rem, calc(1.85 * var(--orb-vp-min)), 1.3rem);      /* was 1.125rem (18px) */
+  --text-2xl: clamp(1.3rem, calc(2.6 * var(--orb-vp-min)), 1.7rem);    /* was 1.5rem (24px) */
+}
+
+/* Numeric value readouts: the lib's `Param` renders its value in `.font-mono` (JetBrains Mono),
+   so param numbers ignored the orbiter's Font Family and looked different from labels/monitors.
+   Map them onto the orbiter font so the creator's Font Family choice applies to the numbers too;
+   keep `tabular-nums` so digits stay fixed-width (no jiggle on drag) even in a proportional font.
+   Specificity (class + attr) beats the lib's single `.font-mono` class — no !important needed.
+   Scoped to `.orbiters-react-ui` so only the orbiter play UI is affected, not the chrome panel. */
+.orbiters-react-ui [data-slot="param-display"] {
+  font-family: var(--orbiters-font-family, var(--font-sans));
+  font-variant-numeric: tabular-nums;
+}
+
+/* Popover-ported params (sync submenu) sit outside `.orbiters-react-ui`, so they need the same
+   font and numeric treatment through the portal slot too. */
+.orbiters-portal-scope [data-slot="popover-content"] [data-slot="webaudio-param"] {
+  font-family: var(--orbiters-font-family, var(--font-sans));
+  font-variant-numeric: tabular-nums;
+}
+.orbiters-portal-scope [data-slot="popover-content"] [data-slot="param-display"] {
+  font-family: var(--orbiters-font-family, var(--font-sans));
+  font-variant-numeric: tabular-nums;
+  color: var(--color1, var(--primary));
+}
+
+/* Legacy frame border: the legacy `.sub-frame` draws a full 1.5px
+   bordered rectangle around the UI. The React shell renders no viewport frame, so hide ONLY
+   the legacy border here — the `.sub-frame` itself stays (it's the legacy layout container).
+   Border-color:transparent (not `border:0`) keeps the box metrics identical → no layout shift
+   for the still-mounted legacy chrome underneath. Scoped to `?ui=react` so the legacy UI keeps
+   its own frame. */
+body[data-ui-react="on"] .sub-frame {
+  border-color: transparent !important;
+}
+
+/* lil-gui edit-panel clearance: when the React play UI is on (`?ui=react`) but the edit panel is still
+   lil-gui (no `?reactEditPanel=1`), the lil-gui panel (`.orbiters-edit-panel`, floating at z:1000, left
+   column) would collide with the React header-left cluster. Give the React UI a left clearance via
+   `:has()`. The Orbiter Studio (`?reactEditPanel=1`) does NOT create `.orbiters-edit-panel` (it registers
+   a bridge, no floating panel) — it uses its own placeholder layout below — so this never applies there. */
+body:has(.orbiters-edit-panel) .orbiters-react-ui {
+  --orbiters-edit-panel-clearance: 400px;
+}
+
+/* ── Orbiter Studio ───────────────────────────────────────────────────────────
+   The edit-mode shell that WRAPS the play UI. The play `.orbiters-react-ui` grid moves into the
+   left placeholder (`.orb-studio__stage`) untouched; the edit panel docks in the right placeholder
+   (`.orb-studio__panel`). The shell layer is pointer-transparent so canvas drags fall through on the
+   stage — only the panel (and the play UI's own interactive controls) opt pointer events back in. */
+.orb-studio {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  z-index: var(--orbiters-react-ui-z);
+  pointer-events: none;
+}
+/* The orbiter's placeholder. `position: relative` so the play overlay (absolute, inset:0) fills
+   exactly this region — the orbiter + its live play UI, untouched. */
+.orb-studio__stage {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+/* The edit panel's own dedicated space — flush to the right edge, full height, never overlaying the
+   orbiter on desktop. Width is set inline from PANEL_WIDTH (the single source shared with the canvas
+   inset below). surface-frosted (a hand-written lib class) paints the material. */
+.orb-studio__panel {
+  flex: 0 0 auto;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  pointer-events: auto;
+  color: var(--card-foreground);
+}
+/* The mobile bottom bar. It is PORTALLED to <body> (see StudioShell) so it can out-stack the
+   body-portalled bottom Drawer and the sheet slides down BEHIND it; this class therefore lands directly
+   on the lib's `[data-slot="bottom-nav-bar"]` root, not on a wrapper inside `.orb-studio`.
+   Pointer events are opted back in because the shell layer it visually belongs to is transparent (canvas
+   drags fall through the stage). */
+.orb-studio__bar {
+  pointer-events: auto;
+}
+/* Bar FRAME follows the ORBITER border token, not the dark chrome preset ───────
+   The mobile launcher bar FLOATS over the orbiter/play surface, so its edge should
+   read as part of THAT surface — same border token as the white play-UI controls
+   around it. The lib BottomNavBar draws its top edge on `[data-slot="bottom-nav-bar-
+   surface"]` via `.border-b-top` (= `var(--border-2)`) / `.border-t` (= `var(--border)`).
+   But `applyStudioChromeTheme` writes the user preset's DARK `--border`/`--border-2`
+   inline onto `.orb-studio__bar` (for the bar's CONTENT — icons/labels follow the
+   chrome theme), so the surface inherited a near-black edge that clashed with the
+   orbiter-white play UI. Re-point ONLY the two border tokens at the orbiter ink
+   (`--color1`, the same Color-A token the play UI's `--border` resolves to) on the
+   nav SURFACE — the element that actually draws the edge, and a CHILD of the
+   chrome-themed bar root, so this rule beats the value INHERITED from the root's
+   inline style while the chrome FOREGROUND tokens are untouched. (It must stay on the
+   child: `applyStudioChromeTheme` writes `--border` inline on the bar root itself, and
+   an inline value would outrank a rule targeting that same element.) The bar is
+   portalled to <body>, but `--color1` is defined on the ROOT element, so it still
+   resolves to the same orbiter ink there. Desktop's `.orb-studio__panel` edge is left
+   on the chrome token (reads correctly there). */
+.orb-studio__bar [data-slot="bottom-nav-bar-surface"] {
+  --border: var(--color1, #ffffff);
+  --border-2: var(--color1, #ffffff);
+}
+
+/* Mobile overlap fix: the lib BottomNavBar is `position:fixed; bottom:0` at `--nav-mobile-bar-height`
+   (4rem), so the play grid's bottom-anchored readouts (axis values / dim numerals) would sit UNDER it.
+   Reserve the bar's height at the foot of the play grid so they clear it. Gated on `[data-mobile-bar]`
+   so it applies ONLY in the studio mobile branch (the bar isn't rendered on desktop or in play mode) —
+   the bar is PORTALLED to <body>, so it is no longer a child of `.orb-studio` and a `:has(> .bar)` gate
+   would never match. Tracks the lib bar-height var + the device safe-area so it stays exact. The grid is
+   `box-sizing:border-box`, so this shrinks its content box and lifts the row. */
+.orb-studio[data-mobile-bar] .orbiters-react-ui {
+  padding-bottom: calc(
+    var(--orb-margin) + var(--nav-mobile-bar-height, 4rem) + env(safe-area-inset-bottom, 0px)
+  );
+}
+
+/* The mobile sheet's horizontal panel switcher (lib DrawerPanels): every mode is mounted in one grid
+   cell and slid into view, so the sheet keeps the tallest mode's height and never resizes on a switch.
+   The lib owns the grid + slide + the vertical scroll; this only gives it a flex height context inside
+   the drawer column and the panel padding (the app owns panel padding — matching `.orb-studio__scroll`,
+   which still dresses the desktop rail). Real CSS: orbiters has no Tailwind build. */
+.orb-studio__panels {
+  flex: 1 1 auto;
+  min-height: 0;
+  /* Same FieldRow label column as the desktop rail so a caption doesn't wrap differently per surface. */
+  --field-row-label: 9.75rem;
+}
+.orb-studio__panels [data-slot="drawer-panel"] {
+  padding: 16px 16px 20px;
+}
+
+.orb-studio__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  /* Inner breathing room so controls don't sit flush against the panel edge (the app owns the panel
+     padding; the lib controls only bring their own internal spacing). Matches the EW inspector. */
+  padding: 16px 16px 20px;
+  /* Widen the lib FieldRow label column (default 8.5rem) so this panel's longest 14px caption
+     ("Frame Border Width") stays on one line. Uses the lib's documented `--field-row-label` knob —
+     per-context width tuning, not a fork — and is scoped to the Studio panel so EW is unaffected. */
+  --field-row-label: 9.75rem;
+}
+/* Engine content: ONE axis at a time, picked via an X/Y/Z segmented rail. Generous spacing so
+   the knobs + labels breathe; the module's full name shows (no truncation, since only one axis is up).
+   Real CSS — orbiters has no Tailwind build, so only the lib's shipped token classes are available. */
+.orb-studio__engine {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding-block: 0.5rem 0.75rem;
+}
+/* Module row: the library single-select combobox, full panel width. */
+.orb-studio__module-pick {
+  min-width: 0;
+}
+.orb-studio__module-pick > * {
+  width: 100%;
+}
+/* The module combobox popover matches the trigger width exactly — the lib's 90vw
+   safety cap would otherwise leave it a hair narrower than the full-width trigger. */
+.orb-studio__module-portal [data-slot='popover-content'] {
+  max-width: none;
+}
+/* When iOS opens its keyboard it shrinks `visualViewport` without reliably re-running Radix's
+   collision measurement. Keep the filter row on-screen by shrinking only the scrollable results;
+   the popover stays anchored above its trigger and the list remains fully reachable by scrolling. */
+@media (max-width: 767px) {
+  .orb-studio__module-portal [cmdk-list] {
+    max-height: max(
+      6rem,
+      min(300px, calc(var(--orb-studio-visual-viewport-height, 100dvh) * 0.4))
+    );
+  }
+}
+/* Min · Equil · Max — three big knobs in a row, each label / knob / value stacked, well spaced. */
+.orb-studio__axis-ranges {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem 0.75rem;
+  padding-block: 0.25rem;
+}
+.orb-studio__axis-range {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+}
+.orb-studio__axis-range-label {
+  font-size: 0.8125rem;
+  color: var(--muted-foreground);
+}
+/* Big knobs — close to the original play-UI knob size, clear. */
+.orb-studio__axis-range [data-slot="knob"] {
+  width: 5rem;
+}
+.orb-studio__axis-empty {
+  padding-block: 1.25rem;
+  text-align: center;
+}
+
+/* Panel (design) content: more vertical distance between rows so the list breathes (Bruna) — the lib
+   FieldRow's own padding is tight, so add inter-row gap on top of it. */
+.orb-studio__design {
+  gap: 0.6rem;
+}
+
+/* Studio menus/popovers are Radix portals mounted under <body>, outside `.orb-studio__panel`.
+   The panel element itself receives the USER chrome theme from `studioChromeTheme.js`; this class reads
+   that same mirrored token set for studio portalled surfaces only. The orbiter content theme remains
+   scoped to `.orbiters-react-ui` and is not touched here. */
+body[data-orb-studio-chrome-theme="on"] .orb-studio__portal-surface {
+  --background: var(--orb-studio-chrome-background, var(--background));
+  --foreground: var(--orb-studio-chrome-foreground, var(--foreground));
+  --card: var(--orb-studio-chrome-card, var(--card));
+  --card-foreground: var(--orb-studio-chrome-card-foreground, var(--card-foreground));
+  --popover: var(--orb-studio-chrome-popover, var(--popover));
+  --popover-foreground: var(--orb-studio-chrome-popover-foreground, var(--popover-foreground));
+  --primary: var(--orb-studio-chrome-primary, var(--primary));
+  --primary-foreground: var(--orb-studio-chrome-primary-foreground, var(--primary-foreground));
+  --secondary: var(--orb-studio-chrome-secondary, var(--secondary));
+  --secondary-foreground: var(--orb-studio-chrome-secondary-foreground, var(--secondary-foreground));
+  --muted: var(--orb-studio-chrome-muted, var(--muted));
+  --muted-foreground: var(--orb-studio-chrome-muted-foreground, var(--muted-foreground));
+  --accent: var(--orb-studio-chrome-accent, var(--accent));
+  --accent-foreground: var(--orb-studio-chrome-accent-foreground, var(--accent-foreground));
+  --border: var(--orb-studio-chrome-border, var(--border));
+  --input: var(--orb-studio-chrome-input, var(--input));
+  --ring: var(--orb-studio-chrome-ring, var(--ring));
+  --radius: var(--orb-studio-chrome-radius, var(--radius));
+  --color-background: var(--orb-studio-chrome-color-background, var(--background));
+  --color-foreground: var(--orb-studio-chrome-color-foreground, var(--foreground));
+  --color-card: var(--orb-studio-chrome-color-card, var(--card));
+  --color-card-foreground: var(--orb-studio-chrome-color-card-foreground, var(--card-foreground));
+  --color-popover: var(--orb-studio-chrome-color-popover, var(--popover));
+  --color-popover-foreground: var(--orb-studio-chrome-color-popover-foreground, var(--popover-foreground));
+  --color-primary: var(--orb-studio-chrome-color-primary, var(--primary));
+  --color-primary-foreground: var(--orb-studio-chrome-color-primary-foreground, var(--primary-foreground));
+  --color-secondary: var(--orb-studio-chrome-color-secondary, var(--secondary));
+  --color-secondary-foreground: var(--orb-studio-chrome-color-secondary-foreground, var(--secondary-foreground));
+  --color-muted: var(--orb-studio-chrome-color-muted, var(--muted));
+  --color-muted-foreground: var(--orb-studio-chrome-color-muted-foreground, var(--muted-foreground));
+  --color-accent: var(--orb-studio-chrome-color-accent, var(--accent));
+  --color-accent-foreground: var(--orb-studio-chrome-color-accent-foreground, var(--accent-foreground));
+  --color-border: var(--orb-studio-chrome-color-border, var(--border));
+  --color-border-2: var(--orb-studio-chrome-color-border-2, var(--border-2));
+  --color-input: var(--orb-studio-chrome-color-input, var(--input));
+  --color-ring: var(--orb-studio-chrome-color-ring, var(--ring));
+  font-family: var(--orb-studio-chrome-font-sans, var(--font-sans));
+}
+
+/* Collection menus still use the shared body portal bridge. Paint those Radix panels explicitly
+   from its resolved chrome tokens. Inspector selects and module pickers inherit from real themed
+   containers instead. */
+body[data-orb-studio-chrome-theme="on"] [data-slot="dropdown-menu-content"].orb-studio__portal-surface,
+body[data-orb-studio-chrome-theme="on"] [data-slot="dropdown-menu-sub-content"].orb-studio__portal-surface {
+  background: var(--color-popover);
+  color: var(--color-popover-foreground);
+  border-color: color-mix(in srgb, var(--color-border) 45%, transparent);
+}
+body[data-orb-studio-chrome-theme="on"] [data-slot="dropdown-menu-content"].orb-studio__portal-surface [data-slot="dropdown-menu-item"][data-highlighted],
+body[data-orb-studio-chrome-theme="on"] [data-slot="dropdown-menu-content"].orb-studio__portal-surface [data-slot="dropdown-menu-checkbox-item"][data-highlighted],
+body[data-orb-studio-chrome-theme="on"] [data-slot="dropdown-menu-content"].orb-studio__portal-surface [data-slot="dropdown-menu-radio-item"][data-highlighted],
+body[data-orb-studio-chrome-theme="on"] [data-slot="dropdown-menu-content"].orb-studio__portal-surface [data-slot="dropdown-menu-sub-trigger"][data-highlighted],
+body[data-orb-studio-chrome-theme="on"] [data-slot="dropdown-menu-sub-content"].orb-studio__portal-surface [data-slot="dropdown-menu-item"][data-highlighted],
+body[data-orb-studio-chrome-theme="on"] [data-slot="dropdown-menu-sub-content"].orb-studio__portal-surface [data-slot="dropdown-menu-checkbox-item"][data-highlighted],
+body[data-orb-studio-chrome-theme="on"] [data-slot="dropdown-menu-sub-content"].orb-studio__portal-surface [data-slot="dropdown-menu-radio-item"][data-highlighted],
+body[data-orb-studio-chrome-theme="on"] [data-slot="dropdown-menu-sub-content"].orb-studio__portal-surface [data-slot="dropdown-menu-sub-trigger"][data-highlighted] {
+  background: var(--color-popover-foreground);
+  color: var(--color-popover);
+}
+body[data-orb-studio-chrome-theme="on"] [data-slot="dropdown-menu-content"].orb-studio__portal-surface [data-highlighted] svg:not([class*='text-']),
+body[data-orb-studio-chrome-theme="on"] [data-slot="dropdown-menu-sub-content"].orb-studio__portal-surface [data-highlighted] svg:not([class*='text-']) {
+  color: var(--color-popover);
+}
+
+/* The confirm dialog (a Radix AlertDialog portalled to <body>) is the same case as the menus above:
+   it is chrome, so it must be PAINTED from the resolved chrome tokens rather than left to the
+   library's `bg-background` utility — an unpainted surface reads as a transparent panel with the
+   scene showing straight through it. Same rule, same tokens; the overlay keeps the library's dim. */
+body[data-orb-studio-chrome-theme="on"] [data-slot="alert-dialog-content"].orb-studio__portal-surface {
+  background: var(--color-background);
+  color: var(--color-foreground);
+  border: 1px solid color-mix(in srgb, var(--color-border) 45%, transparent);
+}
+
+/* Canvas reframe is NOT done in CSS: the orbiter's render is confined to the left region by the scene
+   controller (`WorldSceneController.setViewportInset`, called from StudioShell), which re-fits renderer
+   size AND camera aspect together so the 3D scene never deforms. Sizing the canvas via CSS alone would
+   squish the WebGL buffer (a <canvas> is a replaced element). The shell layout below positions the React
+   play overlay + panel; the controller positions the canvas underneath. */
+
+/* The single React root. Pointer-transparent (drags fall through to #canvas3D,
+   z-index:1, pointer-events:auto). Absolutely positioned over the full viewport
+   exactly like `.ui-overlay`.
+
+   LAYOUT: a real named-areas CSS grid (replaces the old magic-% absolute overlay). Three
+   rows (header / main canvas / bottom) and three columns (left lane | center | right lane).
+   Regions are placed with `grid-area` (see each region block). The `auto` side columns size
+   to the fader / icon clusters and reserve the side lanes; the center `1fr` is where the
+   canvas shows through. One token set (`--orb-margin/--orb-gutter/--orb-row-gap`) drives all
+   spacing — no per-region percentages. `box-sizing:border-box` so the padding stays inside
+   the 100%×100% box. */
+.orbiters-react-ui {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  display: grid;
+  /* `minmax(0, 1fr)` (not bare `1fr`) on BOTH the center column and the main row: a `1fr` track's
+     implicit min size is `auto` = the content's min-content, so a wide intrinsic child — e.g. the
+     waveform canvas (~2300px) — would blow the center column out PAST the viewport and break
+     the whole app with horizontal overflow. `minmax(0, …)` lets the track shrink below content so
+     the waveform host is bounded to the viewport (and the waveform then measures/redraws to that width). */
+  /* The two SIDE columns are pinned to the SAME width (`--orb-action-size`, what the
+     right rail's panel buttons already need) so the center column stays mathematically CENTERED in
+     the viewport at every size. With `auto` side columns the left (dim numerals) and right (rail)
+     sized to their content independently — unequal widths pushed the centre knobs off-centre,
+     worst on small screens where the big Orbit numerals don't shrink below the action-size floor. */
+  grid-template-columns: var(--orb-action-size) minmax(0, 1fr) var(--orb-action-size);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    "header header header"
+    "info   info   right"
+    "dim    xyz    right";
+  column-gap: var(--orb-gutter);
+  row-gap: var(--orb-row-gap);
+  /* The outer frame is NOTCH-SAFE on all four sides — each side is the base
+     `--orb-margin` PLUS the device safe-area inset for that edge, so the interface always clears a
+     camera notch / rounded corner / home indicator (and is exactly `--orb-margin` on edges with no
+     inset). `env(...)` resolves to 0px where there's no safe area, so non-notched screens are
+     unchanged. The studio-mobile branch overrides `padding-bottom` to also clear the bottom nav bar. */
+  padding-top: calc(var(--orb-margin) + env(safe-area-inset-top, 0px));
+  padding-right: calc(var(--orb-margin) + env(safe-area-inset-right, 0px));
+  padding-bottom: calc(var(--orb-margin) + env(safe-area-inset-bottom, 0px));
+  padding-left: calc(var(--orb-margin) + env(safe-area-inset-left, 0px));
+  z-index: var(--orbiters-react-ui-z);
+  pointer-events: none;
+  /* Base ink = the orbiter primary (legacy `--color1`). The legacy UI tints ALL
+     text + icons with color1; the lib's dark `--foreground` is white, so without
+     this every number/label/icon renders white instead of the orbiter colour.
+     Icons inherit this via `currentColor`; specific controls (transport green/red,
+     active states) override locally. */
+  color: var(--primary);
+}
+
+/* Every interactive React region opts pointer events back in (strategy §4:
+   "controls opt in"). Region wrappers carry this class. */
+.orbiters-react-ui [data-ui-interactive] {
+  pointer-events: auto;
+}
+
+/* ── Debug grid overlay (`?grid=1`) ──────────────────────────────────────────
+   GridOverlay renders one labelled tinted box per named area, each a DIRECT grid child
+   placed by `grid-area`, so they line up exactly with the real regions (same grid). Lets
+   Bruna SEE the layout. Always pointer-transparent so it never eats canvas drags. */
+.orbiters-react-ui__grid-cell {
+  pointer-events: none;
+  outline: 1px dashed color-mix(in srgb, var(--primary) 45%, transparent);
+  background: color-mix(in srgb, var(--primary) 7%, transparent);
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--primary) 70%, transparent);
+  padding: 0.15rem 0.3rem;
+  z-index: 9;
+}
+
+
+/* Arrow Param value display — the lib defaults it to a boxed white readout
+   (`bg-black text-white border rounded px-2 py-1`). The real/reference param values
+   are just PINK TEXT, no box. Override to plain ink text (this selector outspecifies
+   the lib's single-class utilities, so no !important needed). Covers BPM, the axis
+   values, volume, and cosmic monitors uniformly. */
+.orbiters-react-ui [data-slot="param-display"] {
+  background: transparent;
+  border-color: transparent;
+  color: var(--primary);
+  box-shadow: none;
+  padding: 0;
+}
+
+/* "Not wired yet" affordance (review fix): the deferred no-op stub controls (until the audio
+   bridge lands) are dimmed + carry a title tooltip so it reads as
+   intentionally-pending, not broken. Visual only — interaction still flows through
+   (the legacy chrome owns the real action via the compatibility shell). Display
+   contents so the wrapper doesn't disturb the control's own layout. */
+.orbiters-react-ui__not-wired {
+  display: contents;
+}
+.orbiters-react-ui__not-wired > * {
+  opacity: 0.45;
+  cursor: help;
+}
+
+/* Premix volume — mirrors the legacy `.col-1` vertical slider column (index.html:
+   webaudio-slider#gSlider root-param="premix-deck-i"). NOTE the legacy region is
+   named "left-rail" (`data-ui-region="left-rail"`, hence this component's name) but
+   the legacy CSS actually pins `.mid-container .col-1` to the RIGHT edge
+   (style.css: `right: var(--ui-shell-side-safe-inset…)`, vertically centred) — and
+   the reference jam UI shows the fader on the right. So we position it on the right
+   to match, despite the legacy misnomer. No edit-panel clearance needed here (the
+   floating edit panel lives on the LEFT). */
+/* Premix volume — measured real `.mid-container .col-1`: right edge at 5.9%, in the
+   UPPER-MIDDLE (top 17.4%, height 40%), NOT viewport-centred. Vertical fader +
+   numeric value below. */
+/* Right rail: the volume fader + interaction menu as ONE column spanning the middle+bottom
+   grid rows (`right` area), so the right column is INDEPENDENT of the center column's height. When
+   the Cosmic LFO stack makes the center tall, this column gets that same height — the fader grows to
+   fill the freed space instead of being squeezed into the shared (shrinking) middle row. The fader
+   takes all available height above the bottom-pinned menu. Centered so both sit on ONE vertical axis
+   with the bottom-bar buttons. */
+.orbiters-react-ui__right-rail {
+  grid-area: right;
+  justify-self: center;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 0;
+  pointer-events: none; /* children opt back in via data-ui-interactive */
+}
+/* Volume fader — grows to fill the rail above the menu; the slider itself flexes (was a fixed 27vh
+   that didn't adapt when the placeholder shrank). */
+.orbiters-react-ui__left-rail {
+  flex: 1 1 0;
+  min-height: 0;
+  width: var(--orb-btn-size);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.orbiters-react-ui__left-rail-slider {
+  /* The slider FLEXES with the fader's available height in the right rail (the column is
+     independent of the center, so a tall Cosmic LFO gives it room rather than squeezing it), instead
+     of the fixed 27vh that left dead space below. `min-height` keeps it usable when space is tight;
+     `max-height` caps the growth at ~30vh (Bruna: ~70% of the earlier max) so it doesn't run long. */
+  flex: 1 1 0;
+  min-height: 6rem;
+  max-height: calc(30 * var(--orb-vp-h));
+  /* Legacy `#gSlider` width = clamp(1rem, 4.8vw, 2.8rem) — the vw term hits the 2.8rem
+     cap on desktop (≈45px, the measured real width) and widens on narrower screens
+     (@576 override below). */
+  width: clamp(1rem, calc(4.8 * var(--orb-vp-w)), 2.8rem);
+}
+
+/* Header / top bar — the full-width top row of the grid (`header` area), transparent over
+   the canvas (no bar background). Anchored to the top by the grid's first row, inset by the
+   shared `--orb-margin` (root padding) — no more magic top/side percentages. */
+.orbiters-react-ui__header {
+  grid-area: header;
+  pointer-events: auto;
+}
+
+/* The real top bar is transparent text over the canvas (no glass bar). Strip any
+   surface background the lib HeaderShell paints so it reads like the legacy header. */
+.orbiters-react-ui__header [data-slot="header-shell"],
+.orbiters-react-ui__header [data-slot="header-shell"] > * {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  min-height: 0 !important;
+  height: auto !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* The lib HeaderShell lays its slots out as 3 EQUAL columns (`grid-cols-3`), which spreads the
+   left / centered-transport / right groups into wide thirds. Override to `1fr auto 1fr`: the side
+   groups hug the edges, the transport stays centered, and the side dead-space is gone. CSS-only
+   (no HeaderBar change). */
+.orbiters-react-ui__header [data-slot="header-shell-grid"] {
+  grid-template-columns: 1fr auto 1fr;
+  padding: 0;
+  gap: var(--orb-gutter);
+}
+
+/* ONE shared gap for both header clusters (left controls + right actions) so every header
+   control keeps the SAME distance on both sides (Bruna: the right row was compressed at
+   0.5rem vs the left's 1.5rem). Tightens on mobile via the @480 override below. */
+.orbiters-react-ui__header {
+  --orb-header-gap: 1.5rem;
+  /* ONE box + glyph size for EVERY header control — the info / more menus, the transport
+     play·stop·record·loop, and the calibrate / connect corner buttons — so the whole top
+     row reads as one coherent set of equal-size icons on a shared baseline (Bruna). */
+  /* Floor lowered to ~70% of the prior 2.4rem min so the header icons can get
+     smaller on tight viewports (the 5vmin scaling + 3rem max are unchanged). */
+  --orb-header-btn-size: clamp(1.68rem, calc(5 * var(--orb-vp-min)), 3rem);
+  --orb-header-glyph: 1.5rem;
+}
+
+/* Where the camera goes next — the world, or the moon. The last cell of the bottom-left view rail,
+   under the dimensions: the SAME square every button in that column occupies. No active tint,
+   because it shows the DESTINATION and not the current state (the play/pause rule) — there is no
+   "on" to light; the icon is the whole message. */
+.orbiters-react-ui__camera-focus-btn {
+  width: var(--orb-action-size);
+  height: var(--orb-action-size);
+  display: flex;
+  align-items: center;
+  justify-content: center; /* centred in its cell, like the tallies above it */
+  /* The glyph at the same optical size as the panel icons across the way (the lib draws theirs at
+     ~0.6 of the tap target). Match it, or the button reads as a lesser control. */
+  font-size: calc(var(--orb-action-size) * 0.6);
+  line-height: 1;
+  padding: 0;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent; /* the numerals' underline lane — keeps the cells aligned */
+  color: var(--primary);
+  cursor: pointer;
+  pointer-events: auto;
+}
+/* Both states of the button take the column's ONE glyph size — the same the tallies take — so the
+   button never changes size as it toggles, and never disagrees with the cells above it. */
+.orbiters-react-ui__camera-focus-btn > :is(span, img, svg) {
+  width: var(--orb-view-glyph);
+  height: var(--orb-view-glyph);
+  display: block;
+}
+.orbiters-react-ui__camera-focus-btn > svg {
+  stroke-width: 2.25;
+}
+.orbiters-react-ui__camera-focus-btn:hover {
+  color: color-mix(in srgb, var(--primary) 70%, white);
+}
+
+.orbiters-react-ui__header-left {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  /* Roomier spacing between the info / sync / dimension clusters (the @480 mobile
+     compaction tightens this back down). */
+  gap: var(--orb-header-gap);
+  min-width: 0;
+  /* Clear the floating edit panel column in edit mode (it floats at
+     z-index:1000, above the header at z:3, so without this the info/sync/dimension
+     controls sit behind it); 0 outside edit mode. The panel is NOT hidden by the
+     legacy-hide gate (no React replacement), so this clearance stays until the
+     panel's own React replacement lands (cleanup-ledger C). */
+  margin-left: var(--orbiters-edit-panel-clearance, 0);
+}
+
+.orbiters-react-ui__header-right-actions {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  /* Same shared gap as the left cluster — the icon-button row is no longer compressed. */
+  gap: var(--orb-header-gap);
+}
+
+/* The ABG trigger is `text-foreground` (white); the real header info/more glyphs are
+   the primary ink. Tint them primary. */
+.orbiters-react-ui__header [data-slot="action-button-group"] button {
+  color: var(--primary);
+}
+/* ONE control-box size for every header button group — info, more, AND the transport
+   (it lives in the brand slot, inside the header) — so they all match the corner buttons.
+   `--abg-size` must be set on the TRIGGER + ITEM slots too, not just the container: the lib
+   pins `--abg-size:3rem` directly on COLLAPSED triggers (an inline `[--abg-size:3rem]` class),
+   which otherwise overrides the container value and makes the info/more triggers larger than the
+   transport items. The ABG sizes its icon as a fixed ratio of `--abg-size`, so unifying the box
+   automatically unifies the glyphs (no per-icon sizing needed). */
+.orbiters-react-ui__header :is(
+  [data-slot="action-button-group"],
+  [data-slot="action-button-group-trigger"],
+  [data-slot="action-button-group-item"]
+) {
+  --abg-size: var(--orb-header-btn-size);
+}
+/* Header CornerButtons (the sensor calibration / connection buttons) share the same box. */
+.orbiters-react-ui__header-corner-btn {
+  width: var(--orb-header-btn-size);
+  height: var(--orb-header-btn-size);
+}
+/* Corner buttons (calibrate / connect) aren't ActionButtonGroups, so their glyph doesn't derive
+   from `--abg-size` like the info/more/transport icons do — size it explicitly to the shared glyph
+   size so it matches the ~23px the ABG icons resolve to. Scoped to the corner buttons only, so it
+   never touches the self-sizing ABG icons. */
+.orbiters-react-ui__header-corner-btn :is(svg, .ps-icon) {
+  width: var(--orb-header-glyph);
+  height: var(--orb-header-glyph);
+}
+/* Reserved square slots for the OPTIONAL sensor controls (calibrate / connect): the slot holds
+   its width whether or not its button is mounted, so toggling the Sensors panel fades the controls
+   in/out WITHOUT shifting the More menu or each other (Bruna: coherent placeholders / grid cells). */
+.orbiters-react-ui__header-slot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--orb-header-btn-size);
+  height: var(--orb-header-btn-size);
+}
+
+/* (The header title was removed — the transport now lives in the brand/centre slot.) */
+
+/* Sync row — the tempo/SYNC column with the launch-grid picker to its RIGHT (the picker only shows
+   while synced). Horizontal so the picker sits beside the column, not stacked under it. */
+.orbiters-react-ui__sync-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.85rem; /* clear separation from the SYNC button */
+}
+/* Launch-grid picker: a phantom (borderless) chip so it reads as chrome, not a boxed button — the lib
+   QuantizeMenu ships a bordered outline Button; strip the box here and use the orbiter ink. */
+.orbiters-react-ui__sync-row [data-slot="quantize-menu"] {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--color1, var(--primary));
+}
+.orbiters-react-ui__sync-row [data-slot="quantize-menu"]:hover {
+  background: color-mix(in srgb, var(--color1, #ffffff) 12%, transparent);
+}
+
+/* Sync stack — BPM readout stacked ABOVE the SYNC button (legacy `.sync-stack`
+   2-row grid), not side by side. */
+.orbiters-react-ui__sync-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0.1rem;
+  line-height: 1.1;
+}
+
+/* Tempo readout: the NUMBER (tempo) on the LEFT, a small "BPM" unit on the RIGHT — the lib
+   Param renders [label][value], so `row-reverse` puts the value first, the "BPM" label beside it.
+   Tempo, BPM and SYNC all read at ONE size (`--orb-sync-text`) — the numeric tempo no
+   longer dominates the surrounding labels (Bruna). */
+.orbiters-react-ui__sync-stack {
+  --orb-sync-text: 0.7rem;
+}
+.orbiters-react-ui__sync-stack [data-slot="webaudio-param"] {
+  flex-direction: row-reverse;
+  align-items: baseline;
+  gap: 0.3rem;
+}
+/* the "BPM" label (the Param's non-display child) → same size as the value, no stray margin */
+.orbiters-react-ui__sync-stack [data-slot="webaudio-param"] > div:not([data-slot]) {
+  font-size: var(--orb-sync-text);
+  opacity: 0.75;
+  margin: 0;
+}
+/* the tempo value → the SAME size as the BPM unit + SYNC (no oversized numeral) */
+.orbiters-react-ui__sync-stack [data-slot="param-display"] {
+  font-size: var(--orb-sync-text);
+}
+
+/* SYNC enable — a small underlined text button (legacy `#sync-enable`), not a
+   toggle dot. Transparent; tints with the inherited ink; underlined when active. */
+.orbiters-react-ui__sync-btn {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-size: var(--orb-sync-text);
+  letter-spacing: 0.05em;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.85;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.orbiters-react-ui__sync-btn[data-active] {
+  opacity: 1;
+  color: var(--success);
+}
+/* In-session participant count next to SYNC (legacy `SYNC ${peerCount + 1}`). A compact,
+   non-underlined badge so the number reads as a count, not part of the word. Inherits the active
+   success ink from the button; kept small for the tight mobile sync stack. */
+.orbiters-react-ui__sync-count {
+  display: inline-block;
+  margin-left: 0.3em;
+  font-size: 0.9em;
+  font-variant-numeric: tabular-nums;
+  text-decoration: none;
+  opacity: 0.9;
+}
+
+/* Sync settings popover — portaled to <body> but styled like the other menu surfaces.
+   Keep it compact, token-driven, and row-based so it reads like a dropdown rather than a card. */
+.orbiters-react-ui__sync-settings {
+  width: min(19rem, calc(100vw - 2rem));
+  max-width: min(19rem, calc(100vw - 2rem));
+  padding: 0.4rem;
+}
+.orbiters-react-ui__sync-settings-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.2rem 0.25rem 0.45rem;
+}
+.orbiters-react-ui__sync-settings-offset-row {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+.orbiters-react-ui__sync-settings-offset-slider {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 1.75rem;
+}
+.orbiters-react-ui__sync-settings-offset-slider-control {
+  width: 100%;
+  height: 100%;
+}
+.orbiters-react-ui__sync-settings-offset-row [data-slot="webaudio-param"] {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+}
+.orbiters-react-ui__sync-settings-hint {
+  margin: 0;
+  font-size: 0.7rem;
+  line-height: 1.3;
+  opacity: 0.68;
+}
+.orbiters-react-ui__sync-settings-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2rem;
+  padding: 0.45rem 0.25rem 0.45rem;
+  font-size: 0.78rem;
+}
+.orbiters-react-ui__sync-settings-rowlabel {
+  min-width: 0;
+  margin-right: auto; /* push the row's control (Switch / meter fields) to the right edge */
+  font-size: 0.74rem;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0;
+}
+.orbiters-react-ui__meter-fields {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+}
+.orbiters-react-ui__meter-fields [data-slot="webaudio-param"] {
+  width: 2.95rem;
+  justify-content: center;
+}
+.orbiters-react-ui__meter-fields [data-slot="param-display"] {
+  justify-content: center;
+  text-align: center;
+}
+.orbiters-react-ui__meter-slash {
+  display: inline-flex;
+  width: 0.58rem;
+  justify-content: center;
+  align-items: center;
+  opacity: 0.65;
+}
+
+/* Dimension selector (Bruna): a standalone bottom-left COLUMN of I/II/III buttons, sitting
+   ABOVE the transport (moved out of the header, which it crowded on mobile). Bottom-anchored above
+   the transport lane and growing upward; same left inset as the transport/volume lane. */
+/* Dimension selector — bottom-left cell (`dim` area). Column of I/II/III roman numerals,
+   bottom-aligned ("I" on top → "III" at the baseline, Bruna's order). */
+/* The bottom-left VIEW rail: the dimensions, and under them the body the camera orbits. It answers
+   the panel stack in the opposite corner — four cells there, four here — so it is built the same
+   way: a column of IDENTICAL square cells, `--orb-action-size` like the panel buttons. That size is
+   the whole point. These buttons used to shrink-wrap their own labels, so "I" was narrower than
+   "III" and the column came out ragged; a fixed cell makes it a grid instead of a list of words. */
+.orbiters-react-ui__view-rail {
+  grid-area: dim;
+  align-self: end;
+  justify-self: start;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.4rem;
+  pointer-events: none; /* children opt back in via data-ui-interactive */
+}
+.orbiters-react-ui__dimension-selector {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.4rem;
+}
+/* The dimension buttons: a TALLY per dimension — one stroke, two, three — pink ink, the active one
+   green with a green underline. Painted from the bottom up (the first dimension nearest the hand,
+   the camera's world/moon button below it). They were roman numerals, which could never sit in a
+   column of icons: type sets its own width, so "III" out-measured every mark beside it. */
+.orbiters-react-ui__dim-btn {
+  /* A DEDICATED, dimension-INDEPENDENT button style. The bug: these buttons inherited
+     `--font-sans`, which the legacy `applyDesignSettings` REASSIGNS to the active dimension's
+     `--orbiters-font-family` on every switch (see the theme-bridge block above) — so I/II/III
+     changed face/weight per dimension (one looked bold, another didn't). Pin the brand TITLE face
+     (`--font-title` = Orbit; Bruna's pick) — `designManager` never reassigns it, so the numerals
+     read identically across every dimension and selected/unselected state. */
+  font-family: var(--font-title);
+  /* Prominent but CONTINUOUSLY scaled. It used to be `calc(var(--orb-action-size) * 0.5)`,
+     but `--orb-action-size` is the BUTTON tap-target with a 4.6rem floor, so the numerals were
+     pinned ~2.3rem across most mid/small screens ("always big"). Give them their own vmin clamp so
+     they scale smoothly with the viewport (big on desktop, smaller on phones) while staying large. */
+  /* Smaller than the numerals used to be, and deliberately so: at the old size "III" was three
+     glyphs wide and out-measured the camera's icon below it, which made the column look like it
+     held two different kinds of thing. Tie the type to the CELL instead of the viewport, so the
+     widest numeral stays inside the same optical width as an icon at every screen size. */
+  /* The dimensions are TALLY MARKS now, not numerals — drawn on the same grid as every other icon,
+     at the same size as the camera's mark below and the panel icons opposite (the lib draws those
+     at ~0.6 of the tap target). Type could never balance here: each numeral set its own width, so
+     "III" out-measured the icons however small the type got. The font rules below only serve the
+     numeral fallback past the fifth dimension, which has no tally. */
+  font-size: calc(var(--orb-action-size) * 0.6);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  /* The CELL, shared with the camera button below and matched to the panel buttons opposite: every
+     button in this column occupies the same square, and its mark is CENTRED in it — identical marks
+     on an identical grid, which is the whole reason the column reads as one set. */
+  width: var(--orb-action-size);
+  height: var(--orb-action-size);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--primary);
+  cursor: pointer;
+  pointer-events: auto;
+}
+/* ONE size for every mark in this column — the tallies and the camera's world/moon alike. They come
+   from different families (lucide strokes, herbarium glyphs) and each would otherwise size itself,
+   so a single variable holds them together: change it once and all four move as one. They must be
+   the same mark size, not merely the same cell size — a cell can be identical while the thing drawn
+   inside it plainly is not, which is what went wrong before. Lucide's hairlines get a little more
+   body so they hold their own against the herbarium's denser ink. */
+.orbiters-react-ui__view-rail {
+  /* 1em IS the panel icons' size: the cell's type is set to 0.6 of the tap target, which is what the
+     lib draws its own marks at. So every icon in the play UI — four here, four opposite — is one
+     size, and this is the single dial that keeps it that way. */
+  --orb-view-glyph: 1em;
+}
+.orbiters-react-ui__dim-btn > svg {
+  width: var(--orb-view-glyph);
+  height: var(--orb-view-glyph);
+  display: block;
+  stroke-width: 2.25;
+}
+.orbiters-react-ui__dim-btn:hover {
+  color: color-mix(in srgb, var(--primary) 70%, white);
+}
+.orbiters-react-ui__dim-btn[data-active] {
+  color: var(--success);
+  border-bottom-color: var(--success);
+}
+
+/* ── Layout tokens — the grid's single source of spacing/size ────────────────
+   Replaces the old measured-from-legacy percentages (--orb-top/side-inset/bottom/lane,
+   all deleted). The grid's named areas + `auto` side columns now reserve the lanes and
+   anchor every region; these tokens only set the outer margin, the gaps, and control sizes. */
+.orbiters-react-ui {
+  /* Outer frame margin (root padding, all four sides). Keyed to the SMALLER box dimension
+     (`--orb-vp-min` = 1cqmin) so it shrinks when the box is small in EITHER axis — a wide-but-short
+     multi-orbiter tile no longer keeps a width-sized frame that eats its limited height. Big screens
+     still land near the 3rem cap; small/short tiles fall toward the 1.125rem floor. */
+  --orb-margin: clamp(1.125rem, calc(4.5 * var(--orb-vp-min)), 3rem);
+  --orb-gutter: clamp(0.5rem, calc(1.5 * var(--orb-vp-w)), 1rem);  /* column gap between the lanes + center */
+  --orb-row-gap: clamp(0.5rem, calc(2 * var(--orb-vp-h)), 1.25rem);/* row gap between header / main / bottom */
+  /* Monitor/info panel text size — ONE standardized step off the type scale (now fluid; see the
+     `--text-*` clamps above), used for BOTH the row label and the number so they read at the same
+     size. Not a custom per-element clamp — change this single token to move the whole panel up/down
+     the scale. */
+  --orb-panel-text: var(--text-base);
+  /* Knob + slider + cosmic-ƒ numeric value size. ONE token shared by the axis knobs, the volume
+     slider readout AND the Cosmic LFO frequency monitor (all render `[data-slot="param-display"]`
+     inside the axis column), so they always read at the SAME size. Dropped a step from
+     `--text-2xl` ("XL") to `--text-lg` — at XL they were too big once the cosmic ƒ stacked in with
+     the knob values; `lg` keeps them prominent but lighter. Change this single token to retune. */
+  --orb-knob-text: var(--text-lg);
+  /* KNOB size — the XYZ knobs are the MAIN controls, so they stay the largest box (cap sits above
+     the side-action cap below), but they scale DOWN more on a constrained box so they stop growing
+     into the transport / off the edge on smaller windows and multi-orbiter tiles: lower floor (was
+     4.6rem) so a small box shrinks them, a slightly lower cap (was 7rem) and a gentler coefficient
+     (was 11) so the curve isn't as steep. Width-based (legacy `.xyz-knobs` was `11vw`). */
+  --orb-control-size: clamp(3rem, calc(9 * var(--orb-vp-w)), 6rem);
+  /* Waveform height — a fraction of the box height so it shrinks with the tile. Reduced from the
+     old flat 30% of the box (`30 * --orb-vp-h`) to ~20% (≈two-thirds) so it stops eating vertical
+     space, most noticeably on a short box; the rem bounds keep it usable when tiny and stop it
+     dominating a very tall screen. ONE knob for both the in-tree host and the kit's waveform lane. */
+  --waveform-height: clamp(4.5rem, calc(20 * var(--orb-vp-h)), 18rem);
+  /* SIDE ACTION button size (interaction panel buttons) + the equal side-column lane width.
+     Scale CONTINUOUSLY and COHERENTLY with the dim numerals (`5.2vmin` clamp) so the
+     left (numbers) and right (panel buttons) balance at every size — `10vmin` ≈ 2× the numerals, with
+     a lower 2.4rem floor so the buttons aren't pinned big on mid/small screens (the old 4.6rem floor
+     kept them "always big" while the numbers shrank). vmin-based (not vw): a wide-short screen has
+     vw ≫ vmin, which oversized them. */
+  --orb-action-size: clamp(2.4rem, calc(10 * var(--orb-vp-min)), 5.1rem);
+  /* ONE unified control-button size shared by EVERY button section (header transport,
+     interaction panels, dimension buttons) so they read as one harmonious system (Bruna). */
+  --orb-btn-size: clamp(2rem, calc(4.2 * var(--orb-vp-min)), 2.9rem);
+}
+
+/* XYZ axis row — bottom-center cell (`xyz` area). Three equal knob columns; the `auto` side
+   grid columns already reserve the lanes, so no collision math is needed. */
+.orbiters-react-ui__xyz {
+  grid-area: xyz;
+  align-self: end;
+}
+
+.orbiters-react-ui__xyz-row {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
+}
+
+.orbiters-react-ui__axis-column {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+/* Knob = measured real `.xyz-knobs` (112px ≈ clamp(4.6rem,11vw,7rem)). */
+.orbiters-react-ui__axis-column [data-slot="knob"] {
+  width: var(--orb-control-size);
+}
+
+/* Knob + slider numeric value at XL (--orb-knob-text). Shared by the axis knobs AND the volume
+   slider so the X/Y/Z params read at the same size as the volume control at EVERY width — the
+   axis value no longer shrinks on small screens (the old @480/@320 overrides were removed). */
+.orbiters-react-ui__axis-column [data-slot="param-display"],
+.orbiters-react-ui__left-rail [data-slot="param-display"] {
+  font-size: var(--orb-knob-text);
+}
+
+/* Cosmic LFO per-axis stack — rendered INSIDE the axis column (XYZControls) when the
+   COSMIC_LFO panel is active, mirroring the legacy `.xyz-column` children that
+   PanelManager reveals (`.cosmic-amplitude-control` / `.cosmic-source-selectors` /
+   `.freq-multiplier-btn-lfo` / the `webaudio-monitor` ƒ readout / `.xyz-cosmic-lfo`).
+   The column is bottom-anchored (`.orbiters-react-ui__xyz`), so this stack grows the
+   column UPWARD: the axis knob + value rise, the cosmic controls fill below, and the
+   hexagon enable toggle sits at the bottom — matching the reference captures. */
+.orbiters-react-ui__cosmic-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  /* legacy cosmic-mode `.xyz-column` gap: clamp(0.3rem, 0.85vh, 0.8rem); lower floor to
+     0.2rem so the stack tightens further on short viewports. */
+  gap: clamp(0.2rem, calc(0.85 * var(--orb-vp-h)), 0.8rem);
+}
+
+/* Amplitude (Depth) knob + label cell. */
+.orbiters-react-ui__cosmic-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+/* Cosmic depth knob = 70% of the axis knob (legacy `--cosmic-depth-scale: 0.7`).
+   The Cosmic LFO stack is the most VERTICALLY demanding panel — on short/landscape
+   viewports its lower rows (Depth/glyphs/multipliers/ƒ/hexagon) ran off the bottom because they
+   size off WIDTH (`--orb-control-size` is vw-based) or have vmin floors that ignore limited HEIGHT.
+   Each cosmic component is now `min(<normal size>, <vh cap>)`: the normal term wins on tall screens
+   (desktop look unchanged), the vh cap wins when vertical space is tight so the whole stack fits.
+   The MAIN axis knobs (XYZControls) are intentionally left full-size. */
+.orbiters-react-ui__cosmic-cell [data-slot="knob"] {
+  width: min(calc(var(--orb-control-size) * 0.7), calc(10 * var(--orb-vp-h)));
+}
+
+.orbiters-react-ui__cosmic-label {
+  font-size: clamp(0.55rem, calc(1.6 * var(--orb-vp-h)), 0.7rem);
+  opacity: 0.75;
+}
+
+/* Waveform + source glyphs. Stacked (column) by default — the full-room desktop /
+   portrait layout, where two side-by-side glyphs could overflow a narrow per-axis column. They flip
+   to side-by-side (row) ONLY on a short box (the `@container (max-height:600px)` block below), the
+   legacy reduced-screen pattern, where vertical space is scarce but landscape width is plentiful —
+   reclaiming a row so the Depth knob stays legible. */
+.orbiters-react-ui__cosmic-glyphs {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(0.3rem, calc(1.2 * var(--orb-vp-min)), 0.7rem);
+}
+
+/* Waveform + source selectors = the normalized `ActionButtonGroup` dropdown (the SAME
+   style as the header info/more buttons), NOT a bespoke Select. `--abg-size` sets the
+   trigger box; the trigger glyph is bumped from the lib's 60% slot to 82% so the SELECTED
+   icon reads near the scale of the other cosmic icons (Bruna: both selectors were too
+   small). It stays responsive via the vmin clamp. */
+/* Bump `--abg-size` ON THE TRIGGER itself (the lib sets `[--abg-size:3rem]` directly on
+   that element, so a wrapper value would lose) → a bigger trigger box. */
+.orbiters-react-ui__cosmic-glyph [data-slot="action-button-group-trigger"] {
+  --abg-size: min(clamp(2.8rem, calc(5.6 * var(--orb-vp-min)), 3.6rem), calc(7.5 * var(--orb-vp-h)));
+}
+.orbiters-react-ui__cosmic-glyph [data-slot="action-button-group-trigger"] > span {
+  /* the IconSlot (lib `size-[60%]`) — enlarge so the selected glyph nearly fills the
+     trigger and reads close to the multiplier/knob scale. Backed off from 82% to 78% so
+     the round cosmic glyphs (e.g. `cosmic-lfo`, whose circle is drawn edge-to-edge in its viewBox)
+     get a few pixels of clearance and never read as clipped against the placeholder — still well
+     above the lib's 60% default, so it stays at the multiplier/knob scale (alignment unchanged). */
+  width: 78%;
+  height: 78%;
+}
+
+/* MODE SLOT — holds either the manual frequency knob (+label) OR the ×0.5/×2 multipliers,
+   at a CONSTANT height (sized for the taller knob+label) with its content centred. This
+   is the fix for the legacy mixed-mode misalignment: when one column shows a knob and its
+   neighbours show multipliers, reserving the same height keeps the ƒ readout, the hexagon,
+   and everything above (source/waveform/Depth) aligned across all three columns. Scales
+   with `--orb-control-size`, so it stays correct at every responsive breakpoint. */
+.orbiters-react-ui__cosmic-mode-slot {
+  height: min(calc(var(--orb-control-size) * 0.7 + 1.4rem), calc(12 * var(--orb-vp-h)));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.orbiters-react-ui__cosmic-multipliers {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+}
+/* ×0.5 / ×2 kick switches — legacy `.freq-multiplier-btn-lfo` clamp(2.3rem,4.8vmin,3.35rem). */
+.orbiters-react-ui__cosmic-multipliers [data-slot="switch"] {
+  width: min(clamp(2.3rem, calc(4.8 * var(--orb-vp-min)), 3.35rem), calc(7 * var(--orb-vp-h)));
+}
+
+/* Per-axis enable hexagon — SHARED by the Cosmic LFO (`cX/cY/cZ`) and Sensors (`sX/sY/sZ`)
+   panels via `AxisEnableToggle`. Legacy `.xyz-cosmic-lfo`/`.xyz-sensors-toggle` was
+   clamp(4rem,8.2vmin,5.9rem); the reference reads a touch smaller, 6vmin is true. The
+   showLabel text sits below (absolute) — keep it in the brilliant ink and always visible. */
+.orbiters-react-ui__axis-enable {
+  width: min(clamp(3rem, calc(6 * var(--orb-vp-min)), 4.4rem), calc(9 * var(--orb-vp-h)));
+  /* The lib renders showLabel as `position:absolute; top:100%` (it hangs BELOW the
+     fixed aspect-square hexagon and takes NO flow space). The XYZ panel is bottom-anchored, so
+     that label dropped past the panel + off the bottom of the screen on short viewports. Reserve
+     flow space here so the absolute label lands INSIDE the grid cell (margin ≈ label height). */
+  margin-bottom: min(1.25rem, calc(1.8 * var(--orb-vp-h)));
+}
+.orbiters-react-ui__axis-enable > div:last-child {
+  /* the lib showLabel (`text-muted-foreground`, absolute below the hexagon) — pin it pink
+     so the cX/sX label is always clearly legible over the canvas. The labels are ALWAYS two
+     characters (sX/sY/sZ, cX/cY/cZ) so they must stay on ONE row. The old `overflow-wrap: anywhere`
+     collapsed the shrink-wrapped absolute box's min-content width to a single glyph, so "cX" broke to
+     "c"/"X" and the second row fell off the bottom of the screen. `nowrap` keeps it one row; two
+     centered characters can't spill off the column. */
+  color: var(--primary);
+  font-weight: 600;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* SHORT-box compression for the Cosmic LFO stack (the most vertically demanding panel). When
+   the play UI's box is < ~600px tall (a landscape phone / split-screen window, OR a short
+   multi-orbiter tile) the per-component `min(…vh)` caps above can't shrink enough to fit ~10
+   rows without also shrinking the DESKTOP look, so this discrete breakpoint aggressively
+   compacts ONLY the cosmic extras when height is genuinely limited — a tall box (> 600px) is
+   untouched, and the main axis knobs stay full-size (Bruna). Container-based, so it trips on
+   the tile in multi-orbiter exactly as it trips on a short window in single. */
+@container (max-height: 600px) {
+  .orbiters-react-ui__cosmic-stack {
+    gap: 0.15rem;
+  }
+  /* short = landscape-ish (wide), so the glyphs go side-by-side here to reclaim a row. */
+  .orbiters-react-ui__cosmic-glyphs {
+    flex-direction: row;
+  }
+  .orbiters-react-ui__cosmic-cell {
+    gap: 0.1rem;
+  }
+  /* Depth knob can stay bigger now that the glyphs share one row (Bruna: it was too small). */
+  .orbiters-react-ui__cosmic-cell [data-slot="knob"] {
+    width: calc(9.5 * var(--orb-vp-h));
+  }
+  .orbiters-react-ui__cosmic-label {
+    font-size: clamp(0.5rem, calc(1.5 * var(--orb-vp-h)), 0.65rem);
+  }
+  .orbiters-react-ui__cosmic-glyph [data-slot="action-button-group-trigger"] {
+    --abg-size: calc(5.5 * var(--orb-vp-h));
+  }
+  .orbiters-react-ui__cosmic-mode-slot {
+    height: calc(8 * var(--orb-vp-h));
+  }
+  .orbiters-react-ui__cosmic-multipliers [data-slot="switch"] {
+    width: calc(4.5 * var(--orb-vp-h));
+  }
+  /* ƒ frequency readout — smaller on short (Bruna). */
+  .orbiters-react-ui__cosmic-stack [data-slot="webaudio-param"] {
+    font-size: 0.6rem;
+  }
+  .orbiters-react-ui__axis-enable {
+    width: calc(6 * var(--orb-vp-h));
+    margin-bottom: calc(2.35 * var(--orb-vp-h));
+  }
+  .orbiters-react-ui__axis-enable > div:last-child {
+    font-size: 0.58rem;
+  }
+}
+
+/* Transport (Bruna's mockup): a HORIZONTAL always-expanded row (play / stop / record /
+   loop) in the HEADER CENTRE (the brand slot, replacing the removed title). */
+.orbiters-react-ui__transport {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  /* Same rhythm as the sensor corner-buttons (right cluster) so the brand corner brackets don't
+     crowd/overlap — the buttons are the same CornerButton, they just needed matching spacing. */
+  gap: var(--orb-header-gap);
+}
+/* Box size now comes from the shared header rule (`--orb-header-btn-size`) so the transport
+   matches the info / more / corner controls — see the header section above. */
+/* Inactive icons = primary pink; the ACTIVE one (e.g. loop engaged) goes green via `--abg-active`
+   — the SAME scheme the interaction panels use (no per-icon colours). */
+
+/* Count-in under the play button. The wrap anchors the badge BELOW the button without
+   disturbing the transport row's layout (the badge is absolutely positioned, so the row height /
+   button spacing are unchanged whether or not a count-in is showing). */
+.orbiters-react-ui__play-wrap {
+  position: relative;
+  display: inline-flex;
+}
+/* The countdown number — small, success-tinted, centered under the play button. `pointer-events:none`
+   so it never intercepts a click on the button it sits beneath. Tabular numerals so it doesn't jitter
+   as it ticks down. */
+.orbiters-react-ui__count-in {
+  position: absolute;
+  top: calc(100% + 0.1rem);
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: none;
+  font-size: 0.7rem;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--success);
+  opacity: 0.95;
+}
+
+/* Interaction menu — the vertical panel-icon column (Sensors / Cosmic / Playback / Jamming).
+   A flex child PINNED to the BOTTOM of the right rail (the fader above flex-grows to
+   fill); `margin-top: auto` keeps it at the bottom even when the fader doesn't fill. `flex: none`
+   so it keeps its natural height. `position: relative` so its `__midi-anchors` (absolute,
+   `bottom: calc(100% + …)`) still anchor to this region. */
+.orbiters-react-ui__interaction-menu {
+  flex: 0 0 auto;
+  margin-top: auto;
+  position: relative;
+}
+
+/* These are PANEL buttons, not the small header controls — the larger side-action size.
+   Set `--abg-size` on the TRIGGER + ITEM slots too (not just the container): the lib pins an inline
+   `[--abg-size:3rem]` on the COLLAPSED trigger, so without this the collapsed drop-up button stays
+   tiny (3rem) instead of matching the expanded stack buttons (Bruna: collapsed = expanded size). */
+.orbiters-react-ui__interaction-menu :is(
+  [data-slot="action-button-group"],
+  [data-slot="action-button-group-trigger"],
+  [data-slot="action-button-group-item"]
+) {
+  --abg-size: var(--orb-action-size);
+}
+/* The ABG paints its stack buttons `text-muted-foreground` (white in dark) — but the
+   real interaction icons are the primary ink (pink), with the ACTIVE panel green.
+   Tint inactive icons primary; leave the active one to the lib's `--abg-active`. */
+.orbiters-react-ui__interaction-menu [data-slot="action-button-group"] button:not([data-active]) {
+  color: var(--primary);
+}
+
+/* Persistent per-option MIDI-learn anchors for the COLLAPSED transport / interaction
+   groups. The collapsed drop-up menu rows are transient (Radix mounts them only while open), so
+   the per-option learn targets would vanish; these anchors are ALWAYS in the DOM (so each option's
+   action stays registered + inbound MIDI fires whether the menu is open or closed). They keep a
+   real layout rect at all times (opacity, NOT display:none) so the learn overlay attaches
+   reliably, but are invisible + click-through until MIDI-learn mode is active — where they fade in
+   as a small labelled column by the trigger so each can be mapped. Positioned absolutely within
+   the region (its container is a positioned grid item — `position:relative`), just ABOVE the trigger column. */
+.orbiters-react-ui__midi-anchors {
+  position: absolute;
+  bottom: calc(100% + 0.4rem);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  /* opacity (NOT display:none) so the anchors keep a real rect for the learn overlay to attach.
+     transition:none is REQUIRED (not just omitting it): a global `transition: all` applies here,
+     and because the transport/interaction regions re-render on engine subscriptions (transport
+     ticks during playback), an opacity transition gets stuck mid-flight and the reveal never
+     completes. An instant toggle is robust. */
+  opacity: 0;
+  pointer-events: none;
+  transition: none;
+  z-index: 6;
+}
+body.midi-learn-mode .orbiters-react-ui__midi-anchors {
+  opacity: 1;
+  pointer-events: auto;
+}
+.orbiters-react-ui__midi-anchor {
+  font-size: 0.625rem;
+  line-height: 1;
+  padding: 0.25rem 0.4rem;
+  white-space: nowrap;
+  text-align: center;
+  color: var(--primary);
+  background: color-mix(in srgb, var(--background) 82%, transparent);
+  border: 1px solid color-mix(in srgb, var(--primary) 60%, transparent);
+  border-radius: 0.25rem;
+  cursor: pointer;
+}
+
+/* The click-to-EXIT MIDI-learn button (the legacy more→close swap never worked). Hidden
+   normally; shown only while MIDI-learn mode is active so the user always has a way out. It is not
+   a MIDI-learn target (no data-automatable), so its click exits instead of starting a mapping. */
+.orbiters-react-ui__midi-exit {
+  display: none;
+  /* Overlay the header "more" (⋯) button in the top-right corner — a simple ✕ — instead of
+     top-centre, which covered the (mappable) transport. ABSOLUTE, not fixed: `.orbiters-react-ui`
+     is `position:absolute; inset:0` over the orbiter, so this anchors to the ORBITER's top-right.
+     Fixed anchored it to the whole viewport, which in an embedded Feed put the ✕ at the page
+     corner, far from the orbiter. The ⋯ corner carries no MIDI-learn target, so no learn overlay
+     ever covers this — it does not need to out-stack them. Modest z keeps it below a host page's
+     shell chrome (nav/header/player bar) instead of the old near-max value that blew past them. */
+  position: absolute;
+  /* Inset from the orbiter's top-right so this overlay lands ON the more (⋯) button. */
+  top: var(--orb-margin);
+  right: var(--orb-margin);
+  z-index: 11;
+  width: var(--orb-header-btn-size);
+  height: var(--orb-header-btn-size);
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  line-height: 1;
+  /* Orbiter aesthetic: pink ink on translucent black, hairline primary border — matches the
+     header chrome (NOT a solid red box). Reads as a deliberate exit affordance during learn. */
+  color: var(--primary);
+  background: color-mix(in srgb, var(--background) 78%, transparent);
+  border: 1px solid color-mix(in srgb, var(--primary) 70%, transparent);
+  border-radius: 0.2rem;
+  box-shadow: 0 0 0.6rem color-mix(in srgb, var(--primary) 22%, transparent);
+  cursor: pointer;
+  backdrop-filter: blur(2px);
+}
+.orbiters-react-ui__midi-exit:hover {
+  background: color-mix(in srgb, var(--primary) 16%, var(--background));
+  border-color: var(--primary);
+}
+body.midi-learn-mode .orbiters-react-ui__midi-exit {
+  display: inline-flex;
+}
+
+/* The Autofocus toggle. A text-word button mirroring the SYNC button look
+   (`.orbiters-react-ui__sync-btn`); `data-active` = pressed (ON, success-green underline). Hidden
+   until MIDI-learn mode is active; not a MIDI-learn target (no data-automatable). */
+.orbiters-react-ui__autofocus-btn {
+  display: none;
+  align-items: center;
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-size: var(--orb-sync-text);
+  letter-spacing: 0.05em;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.85;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  position: relative;
+  z-index: 10;
+}
+.orbiters-react-ui__autofocus-btn[data-active] {
+  opacity: 1;
+  color: var(--success);
+}
+body.midi-learn-mode .orbiters-react-ui__autofocus-btn {
+  display: inline-flex;
+}
+
+/* The "Open saved mappings" (folder) button. Same chrome as the exit affordance. Hidden
+   until MIDI-learn mode is active; not a MIDI-learn target. */
+.orbiters-react-ui__midi-open-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--orb-header-btn-size);
+  height: var(--orb-header-btn-size);
+  color: var(--primary);
+  background: color-mix(in srgb, var(--background) 78%, transparent);
+  border: 1px solid color-mix(in srgb, var(--primary) 70%, transparent);
+  border-radius: 0.2rem;
+  cursor: pointer;
+  position: relative;
+  z-index: 10;
+}
+.orbiters-react-ui__midi-open-btn:hover {
+  background: color-mix(in srgb, var(--primary) 16%, var(--background));
+  border-color: var(--primary);
+}
+body.midi-learn-mode .orbiters-react-ui__midi-open-btn {
+  display: inline-flex;
+}
+
+/* While the load-saved-mappings modal is open, suppress the MIDI-learn floating chrome so
+   nothing pokes through the dialog. The exit ✕ sits at a near-max z-index (it intentionally overlays
+   the ⋯ during learn), so a z-index war is the wrong tool; hide it (and the anchors + the two header
+   buttons) for the duration of the modal instead. */
+body.orbiters-load-dialog-open .orbiters-react-ui__midi-exit,
+body.orbiters-load-dialog-open .orbiters-react-ui__midi-anchors,
+body.orbiters-load-dialog-open .orbiters-react-ui__midi-open-btn,
+body.orbiters-load-dialog-open .orbiters-react-ui__autofocus-btn,
+/* The learn overlays + CH/CC badges are body-level (z 1000+), so they'd float ON TOP of the
+   modal — hide them for the dialog's lifetime too. */
+body.orbiters-load-dialog-open .widget-overlay,
+body.orbiters-load-dialog-open .midi-indicator,
+body.orbiters-load-dialog-open .orb-studio__midi-anchors {
+  display: none !important;
+}
+
+/* ── MIDI-learn overlay visuals (moved here from the page-global src/css/style.css) ──────
+   The learn-mode placeholder boxes (`.widget-overlay`), the CH/CC badges (`.midi-indicator`)
+   and the element highlights (`.midi-learn-highlight`) are created by the vanilla managers
+   (MidiOverlayManager / MidiIndicatorManager) and appended to `document.body`. Their styling
+   used to live ONLY in style.css, which the de-iframed Feed embed deliberately does not load
+   ("a host owns its own page") — so in the embed the overlays lost their border and colors.
+   This sheet is imported by both the native React shell and the embed, so it is the single
+   home for these rules. Border width AND style are set explicitly (not left to a default)
+   because these elements live under the host's Tailwind preflight, which resets
+   `border-width: 0` on everything. */
+.widget-overlay {
+  background-color: rgba(0, 0, 0, 0);
+  pointer-events: auto;
+  border: 2px solid var(--highlight-color, #02ff02);
+}
+
+/* Collection-owned targets (studio shell actions: slot select, pager, drawer) tint BLUE so
+   they read apart from the green orbiter-owned mappings. The scope rides on data-midi-scope
+   (stamped at registration; mirrored onto overlays and CH/CC badges). */
+.widget-overlay[data-midi-scope='collection'],
+.midi-learn-highlight[data-midi-scope='collection'] {
+  border-color: var(--midi-collection-color, #38b6ff);
+}
+.midi-indicator[data-midi-scope='collection'] {
+  background-color: var(--midi-collection-color, #38b6ff);
+}
+
+/* Highlight automatable elements during MIDI-learn mode. */
+.midi-learn-highlight {
+  border: 2px solid var(--highlight-color, #02ff02);
+  box-shadow: 0 0 10px rgba(159, 159, 159, 0.5);
+}
+
+[data-automatable='true']:hover {
+  cursor: pointer;
+}
+
+/* The CH/CC badge that names each learned control. */
+.midi-indicator {
+  display: none;
+  position: fixed;
+  background-color: var(--highlight-color, #02ff02);
+  color: #000000;
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-family: var(--orbiters-font-family, 'Lato', sans-serif);
+  /* Matches the inline z the indicator manager sets (see its note): above the overlay boxes,
+     below a host page's shell chrome. */
+  z-index: 42;
+}
+body.midi-learn-mode .midi-indicator {
+  display: block;
+}
+
+/* Disable pointer events on the underlying webaudio widgets during MIDI-learn mode so the
+   body-level overlays (pointer-events: auto, above) own the click that assigns a mapping. */
+.midi-learn-mode webaudio-knob,
+.midi-learn-mode webaudio-param,
+.midi-learn-mode webaudio-slider,
+.midi-learn-mode webaudio-switch,
+.midi-learn-mode webaudio-numeric-keyboard {
+  pointer-events: none;
+}
+
+/* Right-click MIDI context menu (hidden until opened). Bootstrap-dropdown markup; the color
+   overrides below hold up even where the host page does not carry Bootstrap's own theme. */
+#midi-context-menu {
+  display: none;
+  color: #ffffff;
+  background-color: rgba(12, 12, 12, 0.92);
+  --bs-dropdown-bg: rgba(12, 12, 12, 0.92);
+  --bs-dropdown-link-color: #ffffff;
+  --bs-dropdown-link-hover-color: #ffffff;
+  --bs-dropdown-link-hover-bg: rgba(255, 255, 255, 0.18);
+  --bs-dropdown-link-active-color: #ffffff;
+  --bs-dropdown-link-active-bg: rgba(255, 255, 255, 0.24);
+}
+#midi-context-menu .dropdown-item {
+  color: #ffffff;
+}
+#midi-context-menu .dropdown-item:hover,
+#midi-context-menu .dropdown-item:focus {
+  color: #ffffff;
+}
+#midi-context-menu.show {
+  display: block;
+  z-index: 46; /* Above the overlays (40) + badges (42), still below a host page's shell chrome. */
+}
+.midi-disabled #midi-context-menu,
+.midi-disabled #exit-midi-learn,
+.midi-disabled #midi-item {
+  display: none !important;
+}
+
+/* Highlight for dropdown items in MIDI-learn mode. */
+.midi-learn-dropdown {
+  border: 2px solid var(--highlight-color, #02ff02);
+  background-color: rgba(240, 240, 240, 0.954);
+  cursor: pointer;
+}
+.midi-learn-dropdown:hover {
+  background-color: rgb(141, 244, 255);
+}
+
+/* Load-saved-MIDI-mappings dialog. */
+.orbiters-load-mappings-dialog__description {
+  margin: 0 0 0.75rem;
+  opacity: 0.8;
+  font-size: 0.85rem;
+}
+.orbiters-load-mappings-dialog__status {
+  opacity: 0.85;
+  font-size: 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+.orbiters-load-mappings-dialog__loading {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 1.5rem 0.25rem 1rem;
+}
+.orbiters-load-mappings-dialog__loading-text {
+  margin: 0;
+  font-size: 0.85rem;
+  opacity: 0.85;
+  text-align: center;
+}
+.orbiters-load-mappings-dialog__filter {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+.orbiters-load-mappings-dialog__filter input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.orbiters-load-mappings-dialog__filter-count {
+  font-size: 0.78rem;
+  opacity: 0.65;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.orbiters-load-mappings-dialog__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+/* Collection-tab Load/Replace buttons: the collection-owned blue instead of the success
+   green, matching the learn-overlay scope colors. */
+.orbiters-load-mappings-dialog__load-collection {
+  border-color: var(--midi-collection-color, #38b6ff);
+  color: var(--midi-collection-color, #38b6ff);
+}
+.orbiters-load-mappings-dialog__load-collection:hover {
+  background: color-mix(in oklab, var(--midi-collection-color, #38b6ff) 16%, transparent);
+  color: var(--midi-collection-color, #38b6ff);
+}
+.orbiters-load-mappings-dialog__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.3rem;
+}
+.orbiters-load-mappings-dialog__row-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+.orbiters-load-mappings-dialog__row-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.orbiters-load-mappings-dialog__row-count {
+  font-size: 0.8rem;
+  opacity: 0.7;
+}
+.orbiters-load-mappings-dialog__row-actions {
+  display: inline-flex;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+.orbiters-load-mappings-dialog__confirm-text {
+  font-size: 0.85rem;
+}
+
+/* The ABG dropdown menu portals to <body>, so it inherits the global `--border` — which
+   the lib dark theme sets to white → a harsh white box, off against the pink-on-black
+   orbiter look. Give the menu the subtle orbiter ink border the reference uses. (Portaled
+   → global `[data-slot]` selectors below; safe because orbitersUI.css only loads under
+   `?ui=react` and the only ActionButtonGroup menus on the page are the orbiters header's.) */
+.orbiters-portal-scope [data-slot="action-button-group-content"] {
+  border-color: color-mix(in srgb, var(--primary) 35%, transparent);
+}
+
+/* Make the dropdown surfaces THEMSELVES own the orbiter menu colors in app CSS, not just
+   via the design-lib utility classes. This is the deployable safety net for root-dev: Orbiters ships
+   this stylesheet directly through the git dependency path, while an unpublished design-lib fix would
+   never reach that environment. Keep the menu surface black/pink and the highlighted row inverted
+   pink/black even if the shared package build or Tailwind variant ordering differs there. */
+.orbiters-portal-scope [data-slot="dropdown-menu-content"],
+.orbiters-portal-scope [data-slot="dropdown-menu-sub-content"] {
+  background: var(--popover);
+  color: var(--popover-foreground);
+  border-color: color-mix(in srgb, var(--primary) 35%, transparent);
+}
+.orbiters-portal-scope [data-slot="dropdown-menu-content"] [data-slot="dropdown-menu-item"][data-highlighted],
+.orbiters-portal-scope [data-slot="dropdown-menu-content"] [data-slot="dropdown-menu-checkbox-item"][data-highlighted],
+.orbiters-portal-scope [data-slot="dropdown-menu-content"] [data-slot="dropdown-menu-radio-item"][data-highlighted],
+.orbiters-portal-scope [data-slot="dropdown-menu-content"] [data-slot="dropdown-menu-sub-trigger"][data-highlighted],
+.orbiters-portal-scope [data-slot="dropdown-menu-sub-content"] [data-slot="dropdown-menu-item"][data-highlighted],
+.orbiters-portal-scope [data-slot="dropdown-menu-sub-content"] [data-slot="dropdown-menu-checkbox-item"][data-highlighted],
+.orbiters-portal-scope [data-slot="dropdown-menu-sub-content"] [data-slot="dropdown-menu-radio-item"][data-highlighted],
+.orbiters-portal-scope [data-slot="dropdown-menu-sub-content"] [data-slot="dropdown-menu-sub-trigger"][data-highlighted] {
+  background: var(--color-popover-foreground);
+  color: var(--color-popover);
+}
+.orbiters-portal-scope [data-slot="dropdown-menu-content"] [data-highlighted] svg:not([class*='text-']),
+.orbiters-portal-scope [data-slot="dropdown-menu-sub-content"] [data-highlighted] svg:not([class*='text-']) {
+  color: var(--color-popover);
+}
+
+/* Menu MARKERS go on the RIGHT, not the left. The lib puts the selected-radio dot AND the
+   toggle check on the LEFT (`absolute left-2` + `pl-8`); a left marker that appears/
+   disappears shifts the whole icon+label row, mis-aligning items against each other
+   (Bruna's ask — she also dislikes the left selected-dot). Move EVERY marker to the right
+   and give every item ONE consistent left padding, so the icon+label column is always
+   aligned regardless of marker state. */
+.orbiters-portal-scope [data-slot="action-button-group-menu-item"] {
+  padding-left: 0.5rem;
+  padding-right: 1.75rem;
+}
+.orbiters-portal-scope [data-slot="action-button-group-menu-item"] > span.absolute {
+  left: auto;
+  right: 0.5rem;
+}
+
+/* ── Responsiveness phase ─────────────────────────────────────────────────────
+   Mobile-first + embed-aware. Two mechanisms, mirroring the legacy app:
+     (1) continuous clamp() scaling between min/max (the `--orb-*` vars above), and
+     (2) discrete structural swaps at the legacy width breakpoints.
+   These are `@container` queries against the play UI's box (the window in single-orbiter,
+   the tile in multi-orbiter), so the same breakpoints are correct for embeds AND for a
+   multi-orbiter tile — a tile compacts exactly like an equally-sized window. The discrete
+   vertical collapse of the bottom action groups is driven separately by `useNavViewportState`,
+   which measures that SAME container box (a `ResizeObserver` on the nearest `container-type`
+   ancestor) → `isShort`, so the collapse tracks the tile's height like the cq sizing does. The
+   grid's named areas + `auto` side columns reserve the lanes, so
+   regions never overlap at any width. These blocks now only tighten the spacing tokens +
+   control sizes on a small box (the grid layout itself is width-agnostic). */
+
+/* @576: the premix fader thins (legacy `#gSlider` @576 = clamp(1.1rem, 7vw, 2.4rem)). */
+@container (max-width: 576px) {
+  .orbiters-react-ui__left-rail-slider {
+    width: clamp(1.1rem, calc(7 * var(--orb-vp-w)), 2.4rem);
+  }
+}
+
+/* Short mobile boxes: reclaim height for the orbiter stage itself. The screenshoted problem is not
+   horizontal first — it is that the top header chrome + bottom control row stay too tall on phones,
+   leaving the scene with a small middle band. Tighten the shared size tokens on short boxes so the
+   canvas gets that height back without changing the desktop layout. */
+@container (max-height: 720px) {
+  .orbiters-react-ui {
+    --orb-margin: clamp(0.55rem, calc(1.8 * var(--orb-vp-h)), 0.95rem);
+    --orb-gutter: clamp(0.25rem, calc(0.8 * var(--orb-vp-w)), 0.5rem);
+    --orb-row-gap: clamp(0.2rem, calc(0.7 * var(--orb-vp-h)), 0.45rem);
+    --orb-control-size: clamp(4.6rem, calc(7.2 * var(--orb-vp-h)), 4.6rem);
+    --orb-action-size: clamp(1.85rem, calc(5.4 * var(--orb-vp-h)), 2.8rem);
+    --orb-btn-size: clamp(1.7rem, calc(4.2 * var(--orb-vp-h)), 2.3rem);
+  }
+
+  .orbiters-react-ui__header {
+    --orb-header-gap: 0.3rem;
+    --orb-header-btn-size: clamp(1.55rem, calc(4.3 * var(--orb-vp-h)), 2.35rem);
+    --orb-header-glyph: clamp(0.95rem, calc(2.6 * var(--orb-vp-h)), 1.2rem);
+  }
+
+  .orbiters-react-ui__sync-row {
+    gap: 0.45rem;
+  }
+
+  .orbiters-react-ui__sync-stack {
+    --orb-sync-text: 0.58rem;
+  }
+
+  .orbiters-react-ui__axis-column {
+    gap: 0.2rem;
+  }
+}
+
+/* @480: side lanes + knobs + side-action buttons shrink (legacy
+   `--ui-shell-side-lane-width`, `.xyz-knobs`, `--ui-side-action-size` @480). The
+   derived `--orb-lane` shrinks with `--orb-action-size`, so the centre row reclaims
+   the freed side-lane space — same as the legacy flexbox. */
+@container (max-width: 480px) {
+  .orbiters-react-ui {
+    --orb-control-size: clamp(2.75rem, calc(19 * var(--orb-vp-w)), 4.6rem);
+    --orb-action-size: clamp(1.95rem, calc(10.8 * var(--orb-vp-w)), 2.45rem);
+    /* Tighten the outer margin + gutters on mobile (Bruna: pull the side lanes closer to the
+       screen edges so the centre + header get more room). */
+    --orb-margin: clamp(0.6rem, calc(3.75 * var(--orb-vp-w)), 1.35rem);
+    --orb-gutter: clamp(0.35rem, calc(1.2 * var(--orb-vp-w)), 0.6rem);
+  }
+  /* The axis value text NO LONGER shrinks on mobile. It used to drop to ~8px while the
+     volume readout stayed at `--orb-knob-text` (~21px) — the X/Y/Z numbers looked tiny and
+     inconsistent with the volume control. Both now share `--orb-knob-text` (set above) at every
+     width, so the X/Y/Z params read at the same size as the volume slider. */
+  /* Compact the mobile top bar so the info / BPM·SYNC / dimension cluster (and the right
+     action row) fit a small embed without overflowing — tighten the shared header gap. */
+  .orbiters-react-ui__header {
+    --orb-header-gap: 0.15rem;
+    --orb-header-btn-size: 1.45rem;
+    --orb-header-glyph: 0.88rem;
+  }
+  .orbiters-react-ui__header [data-slot="header-shell-grid"] {
+    gap: 0.15rem;
+  }
+  .orbiters-react-ui__header-left,
+  .orbiters-react-ui__header-right-actions {
+    gap: var(--orb-header-gap);
+  }
+  .orbiters-react-ui__sync-row {
+    gap: 0.2rem;
+  }
+  .orbiters-react-ui__sync-stack {
+    --orb-sync-text: 0.54rem;
+  }
+  .orbiters-react-ui__sync-settings {
+    width: min(15rem, calc(100vw - 1rem));
+    max-width: min(15rem, calc(100vw - 1rem));
+  }
+  .orbiters-react-ui__sync-settings-row {
+    gap: 0.4rem;
+    min-height: 1.8rem;
+    padding-inline: 0.15rem;
+  }
+  .orbiters-react-ui__sync-settings-rowlabel {
+    font-size: 0.7rem;
+  }
+  /* Mobile has little horizontal room, so stack the tempo readout into THREE rows:
+     tempo (number) / BPM (unit) / SYNC. `column-reverse` keeps the value on top and the
+     "BPM" unit below it (the lib Param's DOM order is label-then-value). */
+  .orbiters-react-ui__sync-stack [data-slot="webaudio-param"] {
+    flex-direction: column-reverse;
+    align-items: flex-start;
+    gap: 0;
+  }
+  .orbiters-react-ui__cosmic-stack {
+    gap: 0.14rem;
+  }
+  .orbiters-react-ui__cosmic-stack [data-slot="webaudio-param"] {
+    font-size: 0.56rem;
+    line-height: 1;
+  }
+  .orbiters-react-ui__cosmic-stack [data-slot="param-display"] {
+    font-size: 0.72rem;
+    line-height: 1;
+  }
+  .orbiters-react-ui__cosmic-multipliers {
+    gap: 0.3rem;
+  }
+  /* On narrow screens, abandon the two-column label·value grid. The info panel is capped at
+     ~80vw here, so a long Track / Artist / Orbiter name has nowhere to wrap and squeezes the label to
+     one character per line (the reported breakage). Stack each row instead — label on its own line,
+     value on the next, indented (Bruna: "label first, then the name with indentation, in rows"). The
+     `.info-row` is `display: contents` by default (its dt/dd are the grid items); turning it into a
+     block lets dt/dd flow vertically. */
+  .orbiters-react-ui__info-rows {
+    display: block;
+  }
+  .orbiters-react-ui__info-row {
+    display: block;
+  }
+  .orbiters-react-ui__info-row + .orbiters-react-ui__info-row {
+    margin-top: 0.5rem;
+  }
+  .orbiters-react-ui__info-row-label {
+    display: block;
+  }
+  .orbiters-react-ui__info-row-value {
+    display: block;
+    text-align: left;
+    padding-left: 0.9rem;
+  }
+  .orbiters-react-ui__info-row-label,
+  .orbiters-react-ui__info-row-value {
+    font-size: clamp(0.58rem, calc(2.4 * var(--orb-vp-w)), 0.74rem);
+  }
+  /* The engine MONITOR keeps the two-column label·value grid on mobile (the stacked block
+     above is for long metadata names) and STRETCHES to the full info lane, so the values use the
+     width with balanced inset instead of being squeezed against the left edge. The panel is then a
+     fixed-width (cell-filling) box, so the layout no longer jumps as values change digit count — the
+     value sits at the right and the flexible label column absorbs the change. */
+  .orbiters-react-ui__info-panel[data-info-mode="monitor"] {
+    width: auto;
+    justify-self: stretch;
+    max-width: none;
+  }
+  .orbiters-react-ui__info-panel[data-info-mode="monitor"] .orbiters-react-ui__info-rows {
+    display: grid;
+    grid-template-columns: 1fr max-content;
+    column-gap: 1.1rem;
+  }
+  .orbiters-react-ui__info-panel[data-info-mode="monitor"] .orbiters-react-ui__info-row {
+    display: contents;
+  }
+  .orbiters-react-ui__info-panel[data-info-mode="monitor"] .orbiters-react-ui__info-row-label {
+    display: block;
+  }
+  .orbiters-react-ui__info-panel[data-info-mode="monitor"] .orbiters-react-ui__info-row-value {
+    display: block;
+    text-align: right;
+    /* a little breathing room before the value + a stable floor so short readouts still reserve
+       space (the value column hugs the right edge, so it never pushes the panel wider). */
+    padding-left: 0.75rem;
+    min-width: 3.5ch;
+  }
+}
+
+/* @320: ultra-narrow tightening (legacy @320 — fixed minimal sizes). */
+@container (max-width: 320px) {
+  .orbiters-react-ui {
+    --orb-control-size: clamp(2.4rem, calc(17.5 * var(--orb-vp-w)), 3.15rem);
+    --orb-action-size: 1.8rem;
+    --orb-margin: 0.6rem;
+  }
+  /* Axis value text stays at `--orb-knob-text` (matches the volume readout) — no @320
+     shrink. */
+}
+
+/* ── Playback panel ───────────────────────────────────────────────────────────
+   The React Playback region: the waveform host + the loop/grid/BPM chrome,
+   shown only when the `playback` interaction panel is active. Centred in the
+   lower-middle, between the reserved side lanes, mirroring the legacy
+   `#waveform-container` area. Construct-once / keep-alive: hidden (not
+   unmounted) when off-panel, so the waveform is not re-initialised on every
+   panel switch (legacy parity). */
+/* Playback panel — a BOUNDED waveform placeholder in the center column, confined to the MAIN row
+   and bottom-anchored, so it sits between the info readout (above) and the XYZ knobs (bottom row,
+   below) instead of swallowing the whole center. `max-height` caps it (it used to span main+bottom
+   ≈ full height); `min-height:0` lets the inner flex (waveform host) shrink rather than force the row
+   to grow. React owns this host box, so the grid controls its footprint. Shown only when the playback panel is active (`.is-active`). */
+.orbiters-react-ui__playback {
+  grid-column: 2;
+  grid-row: 3;              /* bottom row — a docked timeline below the lifted XYZ knobs */
+  align-self: end;
+  justify-self: stretch;
+  min-width: 0;             /* allow the panel to shrink below the waveform's intrinsic width */
+  /* Content-sized: the host carries the designed `--waveform-height` (30vh) so the MAIN zoomview
+     keeps its full 22vh and the overview stays the small 8vh secondary — NOT capped to a tiny strip
+     (a small max-height let the fixed-height overview eat the flexible main view → it collapsed to
+     ~26px). 30vh + chrome ≈ 38vh: a prominent main waveform, still not the full screen. */
+  flex-direction: column;
+  gap: clamp(0.3rem, calc(0.8 * var(--orb-vp-w)), 0.6rem);
+  display: none; /* shown via .is-active when the playback panel is active */
+}
+.orbiters-react-ui__playback.is-active {
+  display: flex;
+}
+
+/* When Playback is active the waveform docks in the bottom row, so lift the XYZ knobs into the
+   main row (bottom-aligned) — they sit directly ABOVE the waveform (Bruna: knobs on top, waveform
+   below, not full height). Different rows ⇒ they stack with no overlap. Gated via :has so
+   jam/sensors/cosmic panels are unaffected. */
+.orbiters-react-ui:has(.orbiters-react-ui__playback.is-active) .orbiters-react-ui__xyz {
+  grid-row: 2;
+  align-self: end;
+}
+
+/* The lifted XYZ knobs share the main row (row 2) with the info panel (which spans cols 1-2). The
+   knob row is full-width, so they're separated VERTICALLY: keep the info readout pinned to the TOP
+   (it already is) and cap its height during playback so it can't grow down into the bottom-aligned
+   knobs. A clean spatial guard — no z-index stacking hack (review finding). */
+.orbiters-react-ui:has(.orbiters-react-ui__playback.is-active) .orbiters-react-ui__info-panel {
+  max-height: 40%;
+}
+
+.orbiters-react-ui__playback-stage {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* The waveform host — carries the legacy `--waveform-height` (30vh) floor so the main waveform
+   stays prominent. `min-height` (not a fixed height) so it can still grow with the flex panel on
+   tall screens but never collapses the main waveform. */
+.orbiters-react-ui__playback-host {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  flex: 1 1 auto;
+  min-height: var(--waveform-height, clamp(4.5rem, calc(20 * var(--orb-vp-h)), 18rem));
+  overflow: hidden;
+}
+
+.orbiters-react-ui__playback-times {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  width: 100%;
+  margin-top: 0.2rem;
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(0.65rem, calc(1.3 * var(--orb-vp-w)), 0.85rem);
+  color: var(--primary);
+}
+.orbiters-react-ui__playback-time:last-child {
+  text-align: right;
+}
+
+.orbiters-react-ui__playback-chrome {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(0.3rem, calc(0.7 * var(--orb-vp-w)), 0.55rem);
+  width: 100%;
+}
+.orbiters-react-ui__playback-row,
+.orbiters-react-ui__playback-sizes {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: clamp(0.4rem, calc(0.9 * var(--orb-vp-w)), 0.7rem);
+}
+/* The rail mixes items of different heights (the 3-tier Downbeat readout, the 2-tier
+   CornerButtons, the BPM readout). Top-align them — matching the design mock — so every
+   item's icon/value row shares one top edge instead of floating to different heights the
+   way `center` does. The preset sub-row (`.playback-sizes`) stays centered (uniform pills).
+   Airier horizontal rhythm than the base row gap — the controls should breathe, matching the
+   mock's spacing, not sit shoulder-to-shoulder. */
+.orbiters-react-ui__playback-row {
+  align-items: flex-start;
+  gap: clamp(0.7rem, calc(1.8 * var(--orb-vp-w)), 1.4rem);
+}
+
+/* Chrome buttons — plain monospace text toggles matching the reference (no box;
+   ink = primary; active = green underline; disabled = dimmed). */
+/* The kit Playback panel renders in the mobile bottom-sheet DRAWER, a design-lib portal
+   OUTSIDE the `.orbiters-react-ui` scope where `--primary` (= --xplorer-col-1) is defined — there
+   `--primary` falls back to the lib's light default and the labels render black. Drive these off the
+   ROOT-level orbiter ink (`--color1`) / Color C (`--color3`) instead — both are `:root` tokens that
+   reach the portal (the kit readouts already use --color1), matching the --muted/--popover remaps. */
+.orbiters-react-ui__playback-btn {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  padding: 0.15rem 0.35rem;
+  font: inherit;
+  font-size: clamp(0.62rem, calc(1.2 * var(--orb-vp-w)), 0.8rem);
+  letter-spacing: 0.04em;
+  color: var(--color1, var(--primary));
+  cursor: pointer;
+  border-bottom: 1.5px solid transparent;
+  transition: color 0.12s ease, border-color 0.12s ease, opacity 0.12s ease;
+}
+.orbiters-react-ui__playback-btn:hover:not(:disabled) {
+  color: color-mix(in srgb, var(--color1, var(--primary)) 70%, white);
+}
+.orbiters-react-ui__playback-btn.is-active {
+  color: var(--color3, var(--success, #33ff41));
+  border-bottom-color: var(--color3, var(--success, #33ff41));
+}
+.orbiters-react-ui__playback-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+/* Downbeat/BPM (icon+value+label stacks) now live under `.orbiters-react-ui__playback-item` /
+   `[data-slot="param-display"]` styling in `kit-waveform.css`, alongside the CornerButton rail —
+   see the icon-first rail section there (co-located since this component is their only consumer). */
+
+/* ── Info panel (Phase 2 — react-ui-go-live §Phase 2) ────────────────────────
+   Transparent text integrated at the TOP-LEFT, below the header icons (Bruna's device
+   feedback: a centered card covered the scene). Two columns (label · value), matching the
+   legacy info readout — used by BOTH the Engine Monitor and the static views. Mounts on open
+   (infoPanelStore) → a one-shot fade-in `@keyframes`, NOT a `transition` (the always-on global
+   `transition: all` sticks under playback re-renders — the learn-mode-reveal gotcha). */
+/* Info panel — top-left of the main row. It occupies the `info` area, which spans the left lane
+   AND the center column, so a wide readout never forces the left lane wide (the center `1fr` gives
+   it room); `justify-self/align-self: start` pin it to the top-left corner of that area and the
+   canvas shows through the rest. No close button — the Information dropdown toggles the
+   panel (re-selecting the active view closes it). Width sizes to content (a fixed % broke the value
+   column "2 0 H"), capped so it can't swallow the scene; scrolls if a view is taller than its cell. */
+.orbiters-react-ui__info-panel {
+  grid-area: info;
+  align-self: start;
+  justify-self: start;
+  position: relative;
+  width: fit-content;
+  max-width: min(calc(80 * var(--orb-vp-w)), 26rem);
+  max-height: 100%;
+  overflow-y: auto;
+  z-index: 1;
+  color: var(--primary);
+  animation: orbiters-info-fade-in 160ms ease-out;
+}
+@keyframes orbiters-info-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-0.4rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+/* Two-column label · value rows (Engine Monitor + Track / World / Orbiter). The LABEL column is
+   `auto` (content-sized — labels are short: "Release date", "Stellar L⊙"), and the VALUE takes the
+   flexible remainder (`minmax(0, 1fr)`) and wraps. The earlier `1fr auto` did the opposite: a long
+   value's `auto` track ate the whole (≤26rem-capped) panel and starved the `1fr` label down to one
+   character per line — a reported breakage in an early screenshot. On narrow screens the two columns
+   give way to a stacked model entirely (see the `@container (max-width)` block below). */
+.orbiters-react-ui__info-rows {
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.5rem 1.4rem;
+  align-items: baseline;
+}
+.orbiters-react-ui__info-row {
+  display: contents;
+}
+.orbiters-react-ui__info-row-label {
+  color: color-mix(in srgb, var(--primary) 62%, transparent);
+  font-size: var(--orb-panel-text);
+  letter-spacing: 0.03em;
+  /* Allowed to wrap on narrow screens (the value never does). */
+  overflow-wrap: anywhere;
+}
+.orbiters-react-ui__info-row-value {
+  margin: 0;
+  font-size: var(--orb-panel-text);
+  font-variant-numeric: tabular-nums;
+  /* Long string values (track/world/orbiter/artist names) must wrap rather than overflow the panel
+     on mobile. `overflow-wrap: anywhere` lets the grid's `minmax(0, auto)` value track
+     shrink and wrap; short numeric readouts still sit on one line when there's room. */
+  overflow-wrap: anywhere;
+  min-width: 0;
+  text-align: right;
+}
+.orbiters-react-ui__info-empty {
+  margin: 0;
+  font-size: clamp(0.66rem, calc(1.2 * var(--orb-vp-w)), 0.8rem);
+  color: color-mix(in srgb, var(--primary) 50%, transparent);
+}
+
+/* The engine MONITOR readout is numeric (value + unit), unlike the Track / World / Orbiter
+   metadata views (long names that must wrap). Keep each value and its unit on ONE row so a "%" / "Hz"
+   never drops to a second line when there's width to spare. Scoped to the monitor via `data-info-mode`
+   so the metadata views keep their wrapping behaviour. */
+.orbiters-react-ui__info-panel[data-info-mode="monitor"] .orbiters-react-ui__info-row-value {
+  overflow-wrap: normal;
+  white-space: nowrap;
+}
+
+/* ── Login nudge (Tier-1 vanilla→React migration) ───────────────────────────────────────
+   A slotted member of the header-right cluster — matches the icon-button row height + horizontal
+   padding so it aligns with the buttons instead of floating (replaces the legacy bottom-centre link). */
+.orbiters-react-ui__login {
+  display: inline-flex;
+  align-items: center;
+  height: var(--orb-header-btn-size);
+  padding: 0 0.4rem;
+  white-space: nowrap;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--foreground);
+  text-decoration: underline;
+  transition: opacity 160ms ease;
+}
+.orbiters-react-ui__login:hover {
+  opacity: 0.85;
+}
+
+/* ── Sensor pairing dialog (Tier-1 vanilla→React migration) ─────────────────────────────
+   The QR connect/reconnect + local-sensor-choice content inside the design-lib Dialog. Replaces
+   the legacy inline-styled DOM WebRTCManager used to build. Tokens, not hardcoded colours. */
+.orbiters-sensor-pairing {
+  /* Theme (bg/text/border) + padding come from the design-lib Dialog itself (it now emits
+     `data-slot` so the orbiters reset exempts it, and pairs `bg-background`+`text-foreground`).
+     Only the content max-width is a per-instance choice. */
+  max-width: min(92vw, 30rem);
+}
+.orbiters-sensor-pairing__qr {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.625rem;
+  text-align: center;
+  padding: 0.5rem 0;
+}
+.orbiters-sensor-pairing__heading {
+  margin: 0;
+  font-weight: 700;
+}
+.orbiters-sensor-pairing__desc {
+  margin: 0;
+}
+.orbiters-sensor-pairing__qr-img {
+  display: block;
+  width: 150px;
+  height: 150px;
+  border-radius: 0.5rem;
+  background: #fff; /* QR must scan on a light field regardless of theme. */
+  padding: 0.25rem;
+}
+.orbiters-sensor-pairing__manual {
+  margin: 0;
+  font-size: 0.75rem;
+  word-break: break-word;
+  color: color-mix(in srgb, var(--foreground) 70%, transparent);
+}
+.orbiters-sensor-pairing__manual a {
+  color: var(--primary);
+}
+.orbiters-sensor-pairing__error {
+  margin: 0;
+  color: var(--destructive, #d33);
+}
+/* Cards themselves are the design-lib <Card> (border/radius/bg/title/description). Only the
+   two-up layout, the clickable affordance, and the diagram image sizing are local. */
+.orbiters-sensor-pairing__choice {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13.75rem, 1fr));
+  gap: 1rem;
+  padding: 0.5rem 0.25rem;
+}
+.orbiters-sensor-pairing__card {
+  cursor: pointer;
+}
+.orbiters-sensor-pairing__card[aria-disabled='true'] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.orbiters-sensor-pairing__card:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+.orbiters-sensor-pairing__card img {
+  display: block;
+  width: 100%;
+  max-width: 13.75rem;
+  height: auto;
+  margin: 0 auto;
+  border-radius: 0.5rem;
+}
+
+/* Capture-format dialog (RECORD flow) — the aspect-ratio picker + Record CTA. Mirrors the legacy
+   `.capture-preset-picker`: a row of selectable aspect cards (proportional preview box + label),
+   the active one outlined in the orbiter primary. */
+.orbiters-capture-dialog__description {
+  margin: 0 0 0.25rem;
+  font-size: var(--text-sm, 0.875rem);
+  color: var(--muted-foreground, #ffffff);
+}
+.orbiters-capture-dialog__options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+/* The option is now just the interactive wrapper; the brand FourCornerCard draws the frame
+   (success-green corners when selected, neutral border otherwise). */
+.orbiters-capture-dialog__option {
+  display: flex;
+  flex: 1 1 4.5rem;
+  min-width: 4.5rem;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: var(--foreground, #ffffff);
+  cursor: pointer;
+}
+.orbiters-capture-dialog__option-card {
+  width: 100%;
+}
+.orbiters-capture-dialog__option-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.35rem;
+  padding: 0.7rem 0.6rem;
+}
+/* The selected card reads success: tint its content + labels to match the green corners. */
+.orbiters-capture-dialog__option[data-active] {
+  color: var(--success, #16a34a);
+}
+/* The resolution carries an explicit color, so re-tint it to success on the selected card. */
+.orbiters-capture-dialog__option[data-active] .orbiters-capture-dialog__option-meta {
+  color: var(--success, #16a34a);
+}
+.orbiters-capture-dialog__option-preview-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 2.25rem;
+}
+.orbiters-capture-dialog__option-preview {
+  display: block;
+  border: 1px solid currentColor;
+  border-radius: 2px;
+  opacity: 0.85;
+}
+.orbiters-capture-dialog__option-title {
+  font-size: var(--text-sm, 0.875rem);
+  font-weight: 600;
+}
+.orbiters-capture-dialog__option-meta {
+  font-size: var(--text-sm, 0.875rem);
+  color: var(--foreground, #ffffff);
+  font-variant-numeric: tabular-nums;
+}
+.orbiters-capture-dialog__footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+/* The red record dot on the CTA (kept fixed red regardless of the success-outlined text color). */
+.orbiters-capture-dialog__rec-dot {
+  display: inline-block;
+  flex: none;
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  background: var(--destructive, #e5484d);
+}
+
+/* Toast close button (sonner): default is the top-LEFT corner — move it to the top-RIGHT (Bruna),
+   mirroring sonner's own outward offset. !important to reliably beat sonner's bundled default. */
+[data-sonner-toast] [data-close-button] {
+  left: auto !important;
+  right: 0 !important;
+  transform: translate(35%, -35%) !important;
+}
+
+/* ══ Multi-orbiter grid — focused-tile marker ══
+   The multi-orbiter realm (`?multi=1`) renders N orbiter tiles, each mounting its OWN full
+   `.orbiters-react-ui`. The focused tile shows the design-kit corner brackets (FourCornerCard,
+   rendered by MultiOrbiterFocusFrame) — corners only, not a full ring. Here we just position that
+   overlay: pointer-transparent, filling the tile so the brackets land at the tile edges.
+
+   NOTE — RESPONSIVE (tile-relative sizing) is intentionally NOT solved here. The play UI's responsive
+   system already exists (viewport-unit clamps); making it measure the TILE instead of the window must
+   be done as ONE mechanism with a single source of truth (a viewport-unit indirection var overridden
+   per tile), NOT by re-declaring each component's size in a multi override (that = two sources of truth
+   + redoing the whole responsive pass). Planned separately. */
+.orbiters-react-ui__focus-frame {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  /* Above the tile content, below the body-portalled menus/dialogs. */
+  z-index: 4;
+}
+.orbiters-react-ui__focus-frame-card {
+  width: 100%;
+  height: 100%;
+}
+
+/* ── Tile-scoped selection guard ─────────────────────────────────────────────
+   The app page disables selection body-wide (style.css), but host-embedded realms never load
+   that sheet — a camera drag across a tile (the XYZ pointer drive) would select the chrome's
+   text (param labels, dimension numerals). Scoped to the tile subtree so the HOST page's own
+   text stays selectable. */
+.multi-orbiter-cell,
+.multi-orbiter-cell * {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* ── Chrome-owned font tokens ────────────────────────────────────────────────
+   A host page carries its own brand tokens at :root (a different --font-title / --font-sans),
+   and the chrome resolves CSS vars through the cascade — so embedded tiles rendered the HOST's
+   fonts (bold host numerals instead of Orbit). Pin the chrome's static font tokens on its own
+   roots; the per-design body family stays themable via --orbiters-font-family (designManager
+   sets it on the tile's theme root). Values match the app's tokens — no in-app change. */
+.orbiters-react-ui,
+.multi-orbiter-cell {
+  --font-title: 'Orbit';
+  --font-sans: var(--orbiters-font-family, 'Lato', sans-serif);
+}
+
+/* The chrome's base family used to arrive by BODY inheritance (the app page sets the body font
+   from the design theme) — inside a host page that inheritance delivers the host's brand font.
+   The chrome declares its own base; per-design theming still wins via --orbiters-font-family. */
+.orbiters-react-ui {
+  font-family: var(--orbiters-font-family, var(--font-sans));
+}
+
+/* ── Shell MIDI learn anchors (collection studio) ────────────────────────────
+   Slot focus/add, pager, and drawer targets need a real on-screen box only while the user is
+   in MIDI-learn mode — the overlay layer skips zero-size elements, so outside learn mode the
+   chips collapse to nothing and cost nothing. Tokens resolve through the portal-surface chrome
+   mirror, so the chips follow the user chrome theme like the rest of the studio shell. */
+.orb-studio__midi-anchors {
+  display: none;
+  gap: 8px;
+  pointer-events: none;
+}
+body.midi-learn-mode .orb-studio__midi-anchors {
+  display: inline-flex;
+}
+.orb-studio__midi-anchor {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: 9999px;
+  font-size: 12px;
+  white-space: nowrap;
+  background: var(--card, rgba(20, 20, 24, 0.85));
+  color: var(--card-foreground, #ffffff);
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.25));
+}
+
+/* Learn-mode color legend: a small swatch in the target color before each label, so the
+   green (track-owned) vs blue (collection-owned) overlays are self-explanatory. */
+.orb-studio__midi-legend-entry {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  white-space: nowrap;
+  color: var(--card-foreground, #ffffff);
+  background: var(--card, rgba(20, 20, 24, 0.85));
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.25));
+  border-radius: 9999px;
+  padding: 2px 10px;
+}
+.orb-studio__midi-legend-entry::before {
+  content: '';
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  border: 2px solid var(--highlight-color, #02ff02);
+}
+.orb-studio__midi-legend-entry[data-midi-scope='collection']::before {
+  border-color: var(--midi-collection-color, #38b6ff);
+}

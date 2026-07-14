@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Clock kill-gate</title>
+    <style>
+      :root { color-scheme: dark; }
+      body {
+        font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        background: #0e1014; color: #e6e8ec; margin: 0; padding: 24px;
+      }
+      h1 { font-size: 18px; margin: 0 0 8px; }
+      .muted { color: #8b9099; }
+      code { color: #9ad; }
+      .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 12px 0; }
+      .badge { background: #181b22; border: 1px solid #262b35; border-radius: 6px; padding: 4px 8px; }
+      table.readout { border-collapse: collapse; margin: 16px 0; }
+      table.readout td { padding: 4px 14px 4px 0; }
+      table.readout td:first-child { color: #8b9099; white-space: nowrap; }
+      table.readout td:last-child { font-weight: 600; }
+      button {
+        background: #232834; color: #e6e8ec; border: 1px solid #39414f; border-radius: 6px;
+        padding: 8px 14px; cursor: pointer; font: inherit;
+      }
+      button:hover:not(:disabled) { background: #2c3340; }
+      button:disabled { opacity: 0.4; cursor: default; }
+      input[type="number"] { background: #181b22; color: #e6e8ec; border: 1px solid #39414f;
+        border-radius: 6px; padding: 6px 8px; width: 72px; font: inherit; }
+      label { display: inline-flex; gap: 8px; align-items: center; }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/clock-killgate/main.ts"></script>
+  </body>
+</html>

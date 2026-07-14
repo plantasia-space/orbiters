@@ -1,0 +1,70 @@
+/* Per-voice boot overlay (VoiceLoadOverlay.js) — the spinner + progress text over a tile while its
+ * voice boots. Owned by the component and imported from its module, NOT by the app page stylesheet:
+ * the overlay must render in every realm consumer (the app's own multi layouts AND host-embedded
+ * realms, which never load the page-global style.css). The explicit z-index also keeps it above the
+ * realm canvas in a host page, where the canvas paints over unstacked cell content. */
+
+.voice-load-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4%;
+  background: rgba(0, 0, 0, 0.75);
+  color: var(--color1);
+  text-align: center;
+  font-family: var(--orbiters-font-family, 'Lato', sans-serif);
+  pointer-events: none;
+  transition: opacity 0.5s ease-in-out;
+}
+
+.voice-load-overlay--done {
+  opacity: 0;
+}
+
+.voice-load-overlay__spinner {
+  position: relative;
+  width: 18%;
+  aspect-ratio: 1;
+  max-width: 96px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.voice-load-overlay__dot {
+  position: absolute;
+  width: 15%;
+  aspect-ratio: 1;
+  background-color: var(--color2, #ffffff);
+  border-radius: 50%;
+  animation: voice-load-orbit 3s linear infinite;
+}
+
+@keyframes voice-load-orbit {
+  0% { transform: rotate(0deg) translateX(240%) rotate(0deg); }
+  100% { transform: rotate(360deg) translateX(240%) rotate(-360deg); }
+}
+
+.voice-load-overlay__text {
+  font-size: clamp(10px, 1vw, 14px);
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  opacity: 0.9;
+  max-width: 90%;
+  min-height: 2.5em;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.voice-load-overlay--error .voice-load-overlay__spinner {
+  display: none;
+}
+
+.voice-load-overlay--error .voice-load-overlay__text {
+  color: rgba(255, 255, 255, 0.85);
+}

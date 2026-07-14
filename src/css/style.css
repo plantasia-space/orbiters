@@ -1,0 +1,468 @@
+/* Charles Bukowski Style is the answer to everything
+"Not many have style
+Not many can keep style
+I have seen dogs with more style than men,
+although not many dogs have style.
+Cats have it with abundance."*/
+
+/*
+    • 2D UI Elements:
+    • Only UI elements (buttons, sliders, etc.) should receive pointer events.
+    • Positioned to avoid obstructing interactions with the 3D scene.
+    • 3D Scene:
+    • Receives all pointer events when clicking outside the UI elements.
+    • OrbitControls and other interactions function without interference.
+*/
+
+@import "fonts.css";
+@import "ui-utilities.css";
+@import "menu-info.css";
+@import "action-gui.css";
+@import "modals.css";
+
+/* Color Variables */
+:root {
+    --color1: rgb(255, 255, 255); /* Default color */
+    --color2: rgb(187, 187, 187);  /* Hover and active color */
+    --color3: #000000; 
+    --color4: #ffffff;
+    /* MIDI-learn scope colors moved to src/ui/react/orbitersUI.css (the sheet loaded in both
+       the native shell and the de-iframed embed, next to the overlay rules that consume them). */
+    --orbiters-rounded-corners: 5px;
+    --orbiters-frame-border-width: 1.5px;
+    --orbiters-font-family: 'Lato', sans-serif;
+    --orbiters-min-size: 220px;
+
+}
+/* Universal margin/padding reset, in the `base` cascade layer. The design-lib ships a
+   PRECOMPILED Tailwind stylesheet whose component styling lives in `@layer utilities` (and
+   `@layer components`); an UNLAYERED reset beats those layers no matter the specificity, so it
+   would strip the lib components' own padding/margins and render them unstyled. Declaring the
+   reset inside `base` (the same layer Tailwind's own preflight uses, and which the lib's
+   stylesheet orders before `components`/`utilities`) makes every lib utility win automatically —
+   no hand-maintained exclusion list of lib selectors to keep in sync. Legacy (non-lib) elements
+   have no competing layered utility, so they still reset exactly as before. */
+@layer base {
+  * {
+    margin: 0;
+    padding: 0;
+  }
+}
+
+/* Prevent text selection across the UI unless explicitly overridden */
+body,
+body * {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+/* Keep selected top-bar/login elements hidden until the UI loading gate completes. */
+body[data-ui-ready="false"] .orbiters-login-link,
+body[data-ui-ready="false"] .sync-stack,
+body[data-ui-ready="false"] .button-group-container[data-group="dimension-dropdown"] {
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+}
+
+input,
+textarea,
+[contenteditable="true"] {
+    -webkit-user-select: text;
+    -moz-user-select: text;
+    -ms-user-select: text;
+    user-select: text;
+}
+
+.shortcut-hint {
+    display: none;
+    align-items: center;
+    margin-left: 0.35em;
+    font-size: 0.8em;
+    letter-spacing: 0.05em;
+    color: inherit;
+    white-space: nowrap;
+}
+
+[data-nav-shell="desktop"] .shortcut-hint {
+    display: inline-flex;
+}
+
+[data-nav-shell="mobile"] .shortcut-hint {
+    display: none !important;
+}
+
+[data-nav-shell="mobile"] .desktop-only {
+    display: none !important;
+}
+
+[data-nav-shell="mobile"] .top-bar__section--center {
+    display: none !important;
+}
+
+/* Reset general */
+html, body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background-color: black !important;
+    height: 100%;
+    min-width: var(--orbiters-min-size);
+    font-family: var(--orbiters-font-family, 'Lato', sans-serif);
+}
+  .dropdown-menu,
+  .dropup-center-menu {
+    background-color: #000000;
+    border-radius: 10px; /* 6px rounded corners */
+  }
+  
+#loading-screen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.85);
+  color: var(--color1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: 1.5vw;
+  font-weight: 400;
+  font-family: var(--orbiters-font-family, 'Lato', sans-serif);
+  z-index: 9999;
+  transition: opacity 0.5s ease-in-out;
+}
+
+#loading-screen.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  gap: 3vh;
+}
+
+.orbit-container {
+  position: relative;
+  width: 10vw;
+  height: 10vw;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.orbit-dot {
+  position: absolute;
+  width: 1.5vw;
+  height: 1.5vw;
+  background-color: var(--color2);
+  border-radius: 50%;
+  animation: orbit 3s linear infinite;
+}
+
+@keyframes orbit {
+  0% { transform: rotate(0deg) translateX(5vw) rotate(0deg); }
+  100% { transform: rotate(360deg) translateX(5vw) rotate(-360deg); }
+}
+
+.loading-text {
+  font-size: clamp(11px, 1.4vw, 18px);
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  opacity: 0.9;
+  max-width: 95%; /* Wider to prevent wrapping */
+  text-align: center;
+  min-height: 3vh;
+  max-height: 12vh; /* Allow space for multiple lines */
+  font-family: var(--orbiters-font-family, 'Lato', sans-serif);
+  line-height: 1.4; /* Better spacing for multi-line text */
+  white-space: pre-wrap; /* Preserve \n line breaks while allowing long lines to wrap */
+  word-wrap: break-word;
+}
+
+/* Per-tile loading overlay for the multi-orbiter / collection realm (VoiceLoadOverlay).
+   Same visual language as #loading-screen, scaled to the tile. Non-interactive: focus clicks
+   pass through to the realm's tile-focus handler. */
+#transportMenuButton {
+  position: relative;
+}
+
+.transport-buffering-indicator {
+  position: absolute;
+  left: 50%;
+  bottom: -0.45rem;
+  color: var(--color1);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  line-height: 1.2;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%) translateY(2px);
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+@keyframes loadingBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+#transportMenuButton.is-buffering .transport-buffering-indicator {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+  animation: loadingBlink 0.9s steps(1, end) infinite;
+}
+
+.waveform-buffering-status {
+  min-height: 1.1rem;
+  margin-top: 0.25rem;
+  font-size: clamp(11px, 1.1vmin, 13px);
+  letter-spacing: 0.01em;
+  color: var(--color2);
+  opacity: 0;
+  transition: opacity 0.16s ease;
+  text-align: right;
+}
+
+.waveform-buffering-status.visible {
+  opacity: 1;
+}
+
+webaudio-slider {
+    width: 50%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+/* Default state: Widgets are interactive */
+webaudio-knob,
+webaudio-param,
+webaudio-slider,
+webaudio-switch,
+webaudio-numeric-keyboard {
+  pointer-events: auto;
+}
+
+webaudio-param {
+  cursor: ns-resize;
+}
+
+/* All MIDI-learn styling — the overlay boxes, CH/CC badges, element highlights, the pointer
+   disable on automatable widgets, and the right-click context menu — now lives in
+   src/ui/react/orbitersUI.css, the sheet loaded in BOTH the native shell and the de-iframed
+   Feed embed. It used to live here in the page-global sheet, which the embed does not load, so
+   the overlays rendered unstyled there. See the "MIDI-learn overlay visuals" note in that file. */
+
+/* Square Frame: Centered and fixed size */
+/* Responsive Frame: Centered and flexible size */
+.ratio-frame {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100%; /* Take full width of the window */
+    height: 100%; /* Take full height of the window */
+    min-width: var(--orbiters-min-size);
+    min-height: var(--orbiters-min-size);
+    max-width: 100%; /* Restrict to window width */
+    max-height: 100%; /* Restrict to window height */
+    background-color: #000; /* Optional for debugging */
+    overflow: hidden;
+    box-sizing: border-box; /* Prevent padding/borders affecting size */
+}
+
+/* Base canvas styling */
+canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    display: block;
+}
+
+/* Three.js canvas styling */
+#canvas3D {
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    background: transparent;
+    pointer-events: auto; /* Ensure 3D interactions */
+}
+
+/* UI overlay: Positioned over the canvas */
+.ui-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 2;
+    pointer-events: none; /* Pass events through except for interactive elements */
+}
+.sub-frame {
+    position: relative; /* Necessary for absolute positioning of child elements */
+    top: var(--ui-shell-frame-inset);
+    left: var(--ui-shell-frame-inset);
+    width: var(--ui-shell-frame-size);
+    height: var(--ui-shell-frame-size);
+    border: var(--orbiters-frame-border-width, 1.5px) solid var(--color1);
+    border-radius: var(--orbiters-rounded-corners, 5px);
+    display: flex;
+    flex-direction: column; /* Ensures vertical stacking */
+    box-sizing: border-box;
+    background: none;
+    padding: var(--ui-shell-content-inset);
+    overflow: visible; /* Ensure the menu is not clipped */
+    z-index: 1; /* Keep it above the canvas */
+
+}
+
+  
+
+/* EXCLUDE design-lib buttons (`[data-slot]` + their internals) — this reset strips the
+   background / border / padding the lib components style themselves with, making them look
+   unstyled. `:where(:not())` keeps zero specificity so legacy + custom buttons
+   reset exactly as before. */
+button:where(:not([data-slot], [data-slot] *)), .btn, .ui-button {
+    outline: none; /* Remove browser default focus outline */
+    box-shadow: none; /* Prevent any default box shadows */
+    background: none; /* Ensure transparent background */
+    border: none; /* Prevent default borders */
+    padding: 0; /* Reset padding */
+    margin: 0; /* Reset margin */
+    appearance: none; /* Normalize button appearance across browsers */
+  }
+  
+  .btn-primary {
+    --bs-btn-color: #000000;
+    --bs-btn-bg: #000000;
+    --bs-btn-border-color: #0d6efd;
+    --bs-btn-hover-color: #fff;
+    --bs-btn-hover-bg: #000000;
+    --bs-btn-hover-border-color: #000000;
+    --bs-btn-focus-shadow-rgb: 49, 132, 253;
+    --bs-btn-active-color: #ffffff;
+    --bs-btn-active-bg: #000000;
+    --bs-btn-active-border-color: #0a53be;
+    --bs-btn-active-shadow: inset 0 3px 5px rgba(0, 0, 0, 0.125);
+    --bs-btn-disabled-color: #000000;
+}
+
+/* Notifications Container */
+#notification-container {
+  position: fixed;
+  bottom: 20px; /* Adjust as needed */
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1052; /* Ensure it's above other elements */
+  display: flex;
+  flex-direction: column;
+  align-items: center; /* Centers toasts horizontally */
+  justify-content: center; 
+  gap: 10px; /* Spacing between notifications */
+  pointer-events: none; /* Allow interactions to pass through */
+}
+
+/* Toast Styling */
+.notification-toast {
+  font-family: var(--orbiters-font-family, 'Lato', sans-serif);
+  position: relative;
+  background-color: #000000;
+  color: #fff;
+  z-index: 1052;
+  padding: 10px 36px 10px 20px;
+  border-radius: 5px;
+  font-size: 0.8rem;
+  opacity: 0.9;
+  animation: fade-in 0.3s ease;
+  pointer-events: auto; /* Allow interaction with the close button */
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3); /* Add shadow for better visibility */
+  
+  /* Center the text inside the toast */
+  text-align: center;
+}
+
+.notification-toast-message {
+  display: block;
+}
+
+.notification-toast-close {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  font-size: 0.9rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px;
+}
+
+.notification-toast-close:focus-visible {
+  outline: 1px solid rgba(255, 255, 255, 0.7);
+  outline-offset: 2px;
+}
+
+/* Animations for Toasts */
+@keyframes fade-in {
+  from {
+      opacity: 0;
+      transform: translateY(-20px);
+  }
+  to {
+      opacity: 1;
+      transform: translateY(0);
+  }
+}
+
+@keyframes fade-out {
+  from {
+      opacity: 1;
+      transform: translateY(0);
+  }
+  to {
+      opacity: 0;
+      transform: translateY(-20px);
+  }
+}
+
+/* Toast Variants */
+.notification-toast-success {
+    background-color: #28a745;
+}
+
+.notification-toast-error {
+    background-color: #dc3545;
+}
+
+.notification-toast-info {
+    background-color: #17a2b8;
+}
+
+/* Fade-out class */
+.fade-out {
+    animation: fade-out 0.3s ease forwards;
+}
+
+.modal-title {
+  font-family: var(--orbiters-font-family, 'Lato', sans-serif);
+  font-size: clamp(.8rem, 2.5vw, 1.1rem);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  margin: 0;
+  padding: 0.2em 0 0.2em 0;
+  line-height: 1.2;
+  text-align: center;
+}

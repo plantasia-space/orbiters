@@ -1,0 +1,17 @@
+# No trailing slash: worktrees symlink node_modules; a `dir/` rule misses symlinks
+node_modules
+.DS_Store
+dist/
+temp-references.html
+out/
+.env
+/entangled-worlds-reference
+.env.development
+.env.production
+.certs
+planning
+.claude
+claude
+entangled-worlds/src/studio/inspector/.claude
+# Test coverage output
+coverage/

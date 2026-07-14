@@ -1,0 +1,101 @@
+export const EFFECT_MANIFEST = Object.freeze({
+  id: 'tone.pingpongdelay',
+  label: 'Delay',
+  version: '1.0.1',
+  inputParam: 'inputParam',
+  dimensionId: 'EW::III',
+  dimensionLabel: 'EW::III',
+  defaults: Object.freeze({
+    delayTime: '4n',
+    feedback: 0.2,
+    wet: 0.5,
+  }),
+  userParamSpec: Object.freeze({
+    id: 'inputParam',
+    label: 'Mix Control',
+    units: '%',
+    range: Object.freeze({ min: 0, max: 100 }),
+  }),
+  modules: Object.freeze([
+    Object.freeze({
+      id: '4n',
+      label: 'Petal Long',
+      description: 'Quarter-note long echoes.',
+      dimension: 'EW::III',
+      fixed: Object.freeze({ delayTime: '4n' }),
+      valueRange: Object.freeze({ min: 0, max: 100, units: '%' }),
+      initialRange: Object.freeze({ min: 20, max: 80, equilibrium: 0 }),
+      parameterMappings: Object.freeze({
+        wet: { min: 0, max: 1 },
+        feedback: { min: 0, max: 0.5 },
+      }),
+      control: Object.freeze({
+        mode: 'hybrid',
+        audioParam: 'wet',
+        provider: 'node',
+        smoothing: Object.freeze({
+          defaultRamp: 0.08,
+          minRamp: 0.01,
+          maxRamp: 0.8,
+          curve: 'linear',
+        }),
+        signalRange: Object.freeze({ min: 0, max: 1, transform: 'linear' }),
+        secondaryParameters: Object.freeze(['feedback']),
+      }),
+    }),
+    Object.freeze({
+      id: '8n',
+      label: 'Petal Mid',
+      description: 'Eighth-note mid echoes.',
+      dimension: 'EW::III',
+      fixed: Object.freeze({ delayTime: '8n' }),
+      valueRange: Object.freeze({ min: 0, max: 100, units: '%' }),
+      initialRange: Object.freeze({ min: 40, max: 90, equilibrium: 0 }),
+      parameterMappings: Object.freeze({
+        wet: { min: 0, max: 0.9 },
+        feedback: { min: 0, max: 0.45 },
+      }),
+      control: Object.freeze({
+        mode: 'hybrid',
+        audioParam: 'wet',
+        provider: 'node',
+        smoothing: Object.freeze({
+          defaultRamp: 0.08,
+          minRamp: 0.01,
+          maxRamp: 0.8,
+          curve: 'linear',
+        }),
+        signalRange: Object.freeze({ min: 0, max: 1, transform: 'linear' }),
+        secondaryParameters: Object.freeze(['feedback']),
+      }),
+    }),
+    Object.freeze({
+      id: '16n',
+      label: 'Petal Short',
+      description: 'Sixteenth-note short echoes.',
+      dimension: 'EW::III',
+      fixed: Object.freeze({ delayTime: '16n' }),
+      valueRange: Object.freeze({ min: 0, max: 100, units: '%' }),
+      initialRange: Object.freeze({ min: 50, max: 100, equilibrium: 0 }),
+      parameterMappings: Object.freeze({
+        wet: { min: 0, max: 0.8 },
+        feedback: { min: 0, max: 0.4 },
+      }),
+      control: Object.freeze({
+        mode: 'hybrid',
+        audioParam: 'wet',
+        provider: 'node',
+        smoothing: Object.freeze({
+          defaultRamp: 0.08,
+          minRamp: 0.01,
+          maxRamp: 0.8,
+          curve: 'linear',
+        }),
+        signalRange: Object.freeze({ min: 0, max: 1, transform: 'linear' }),
+        secondaryParameters: Object.freeze(['feedback']),
+      }),
+    }),
+  ]),
+});
+
+export default EFFECT_MANIFEST;

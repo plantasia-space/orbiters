@@ -1,0 +1,27 @@
+{
+  // Incremental TS for the vanilla→React migration. tsc is type-check only
+  // (`noEmit`); Vite + @vitejs/plugin-react transpile via esbuild. `allowJs`/`checkJs:false`
+  // let new .tsx import the existing .js modules (ParameterManager, etc.) without dragging
+  // the whole JS codebase through the type-checker — migrate files to TS one at a time.
+  "compilerOptions": {
+    "target": "ESNext",
+    "useDefineForClassFields": true,
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "skipLibCheck": true,
+    "allowJs": true,
+    "checkJs": false
+  },
+  // Root only from TS/TSX during incremental adoption; .js is pulled in on demand via allowJs
+  // (checkJs:false → existing JS isn't type-error-reported). Widen as files migrate to TS.
+  "include": ["src/**/*.ts", "src/**/*.tsx", "dev/**/*.ts", "dev/**/*.tsx"]
+}

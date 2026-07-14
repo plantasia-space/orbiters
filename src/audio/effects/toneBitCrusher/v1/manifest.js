@@ -1,0 +1,132 @@
+export const EFFECT_MANIFEST = Object.freeze({
+  id: 'tone.bitcrusher',
+  label: 'BitCrusher',
+  version: '1.0.1',
+  inputParam: 'inputParam',
+  dimensionId: 'EW::III',
+  dimensionLabel: 'EW::III',
+  // Defaults passed to Tone.BitCrusher constructor
+  defaults: Object.freeze({
+    bits: 8,
+    wet: 0.5,
+  }),
+  // Primary user control for the module
+  userParamSpec: Object.freeze({
+    id: 'inputParam',
+    label: 'Crystal Dust',
+    units: '%',
+    range: Object.freeze({ min: 0, max: 100 }),
+  }),
+  modules: Object.freeze([
+    Object.freeze({
+      id: 'smooth',
+      label: 'Crystal Dust Smooth',
+      description: 'Higher bit depth, softer reduction, rounded digital texture.',
+      dimension: 'EW::III',
+      fixed: Object.freeze({}),
+      target: 'bits',
+      valueRange: Object.freeze({ min: 0, max: 100, units: '%' }),
+      initialRange: Object.freeze({ min: 15, max: 40, equilibrium: 0 }),
+      parameterMappings: Object.freeze({
+        bits: { min: 16, max: 8 },
+        wet: { min: 0, max: 1 },
+      }),
+      control: Object.freeze({
+        mode: 'hybrid',
+        audioParam: 'wet',
+        provider: 'node',
+        smoothing: Object.freeze({
+          defaultRamp: 0.08,
+          minRamp: 0.01,
+          maxRamp: 0.4,
+          curve: 'linear',
+        }),
+        signalRange: Object.freeze({ min: 0, max: 1, transform: 'linear' }),
+        secondaryParameters: Object.freeze(['bits']),
+      }),
+    }),
+    Object.freeze({
+      id: 'grit',
+      label: 'Crystal Dust Grit',
+      description: 'Mid bit depth, audible crunch, old sampler feel.',
+      dimension: 'EW::III',
+      fixed: Object.freeze({}),
+      target: 'bits',
+      valueRange: Object.freeze({ min: 0, max: 100, units: '%' }),
+      initialRange: Object.freeze({ min: 20, max: 70, equilibrium: 0 }),
+      parameterMappings: Object.freeze({
+        bits: { min: 12, max: 6 },
+        wet: { min: 0, max: 1 },
+      }),
+      control: Object.freeze({
+        mode: 'hybrid',
+        audioParam: 'wet',
+        provider: 'node',
+        smoothing: Object.freeze({
+          defaultRamp: 0.08,
+          minRamp: 0.01,
+          maxRamp: 0.4,
+          curve: 'linear',
+        }),
+        signalRange: Object.freeze({ min: 0, max: 1, transform: 'linear' }),
+        secondaryParameters: Object.freeze(['bits']),
+      }),
+    }),
+    Object.freeze({
+      id: 'shatter',
+      label: 'Crystal Dust Shatter',
+      description: 'Low bit depth, very broken and aliased, crackling edges.',
+      dimension: 'EW::III',
+      fixed: Object.freeze({}),
+      target: 'bits',
+      valueRange: Object.freeze({ min: 0, max: 100, units: '%' }),
+      initialRange: Object.freeze({ min: 40, max: 100, equilibrium: 0 }),
+      parameterMappings: Object.freeze({
+        bits: { min: 8, max: 3 },
+        wet: { min: 0, max: 1 },
+      }),
+      control: Object.freeze({
+        mode: 'hybrid',
+        audioParam: 'wet',
+        provider: 'node',
+        smoothing: Object.freeze({
+          defaultRamp: 0.08,
+          minRamp: 0.01,
+          maxRamp: 0.4,
+          curve: 'linear',
+        }),
+        signalRange: Object.freeze({ min: 0, max: 1, transform: 'linear' }),
+        secondaryParameters: Object.freeze(['bits']),
+      }),
+    }),
+    Object.freeze({
+      id: 'destroy',
+      label: 'Crystal Dust Destroy',
+      description: 'Extreme reduction; almost noise-machine / broken radio.',
+      dimension: 'EW::III',
+      fixed: Object.freeze({}),
+      target: 'bits',
+      valueRange: Object.freeze({ min: 0, max: 100, units: '%' }),
+      initialRange: Object.freeze({ min: 70, max: 100, equilibrium: 0 }),
+      parameterMappings: Object.freeze({
+        bits: { min: 6, max: 1 },
+        wet: { min: 0, max: 1 },
+      }),
+      control: Object.freeze({
+        mode: 'hybrid',
+        audioParam: 'wet',
+        provider: 'node',
+        smoothing: Object.freeze({
+          defaultRamp: 0.08,
+          minRamp: 0.01,
+          maxRamp: 0.4,
+          curve: 'linear',
+        }),
+        signalRange: Object.freeze({ min: 0, max: 1, transform: 'linear' }),
+        secondaryParameters: Object.freeze(['bits']),
+      }),
+    }),
+  ]),
+});
+
+export default EFFECT_MANIFEST;

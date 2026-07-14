@@ -1,0 +1,22 @@
+{
+  "plugins": ["plugins/markdown"],
+  "source": {
+    "include": ["src"],
+    "includePattern": ".+\\.js(doc|x)?$",
+    "excludePattern": "(node_modules/|docs)"
+  },
+  "templates": {
+    "cleverLinks": true,
+    "monospaceLinks": false
+  },
+  "opts": {
+    "destination": "./entangled-worlds-reference",
+    "recurse": true,
+    "readme": "README.md",
+    "template": "node_modules/clean-jsdoc-theme"
+  },
+  "markdown": {
+    "hardwrap": false,
+    "idInHeadings": true
+  }
+}

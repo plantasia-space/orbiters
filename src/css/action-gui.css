@@ -1,0 +1,31 @@
+#gSlider {
+    width: clamp(1rem, 4.8vw, 2.8rem);
+    height: 30vh;
+}
+
+@media (max-width: 575.98px) {
+    #gSlider {
+        width: clamp(1.1rem, 7vw, 2.4rem);
+    }
+}
+
+/* Dropdown Menu Styling */
+.dropdown-item {
+    font-family: var(--orbiters-font-family, 'Lato', sans-serif);
+    padding: 0.5rem 1rem;
+    display: flex;
+    align-items: center;
+    transition: #000000 0.3s ease, color 0.3s ease;
+    
+}
+
+/* Default: show the original (black) icon */
+.menu-item-icon {
+    display: inline-block;
+    width: 1rem;
+    height: 1rem;
+    margin-right: 8px;
+    filter: invert(100%);
+    transition: filter 0.3s ease;
+}
+

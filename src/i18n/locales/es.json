@@ -1,0 +1,434 @@
+{
+  "app": {
+    "title": "Orbitadores"
+  },
+  "loading": {
+    "short": "CARGANDO",
+    "audio": "Cargando Audio",
+    "collection": "Cargando colección...",
+    "voiceFailed": "No se pudo cargar este orbitador.",
+    "voiceTimeout": "Este orbitador tardó demasiado en cargar.",
+    "queue": "Cargando cola de reproducción..."
+  },
+  "topBar": {
+    "informationToggle": "Información",
+    "menu": {
+      "engineMonitor": "Monitor del motor",
+      "track": "Audio",
+      "entangledWorld": "Mundo entrelazado",
+      "orbiter": "Orbitador"
+    },
+    "selectDimension": "Seleccionar dimensión",
+    "calibrateSensor": "Calibrar sensor",
+    "connectionStatus": "Dispositivo desconectado",
+    "loopToggle": "Alternar reproducción en bucle",
+    "loopLabel": "Bucle",
+    "moreOptions": "Más opciones",
+    "moreMenu": {
+      "midi": "MIDI",
+      "tooltips": "Tooltips",
+      "share": "Compartir",
+      "fullscreen": "Pantalla completa"
+    },
+    "grid": {
+      "close": "Cerrar cuadrícula"
+    }
+  },
+  "login": {
+    "cta": "Iniciar sesión",
+    "ariaLabel": "Iniciar sesión en Plantasia"
+  },
+  "common": {
+    "close": "Cerrar",
+    "cancel": "Cancelar"
+  },
+  "transport": {
+    "menuLabel": "Controles de transporte",
+    "play": "Reproducir",
+    "pause": "Pausa",
+    "stop": "Detener",
+    "countIn": "{{beats}} hasta empezar"
+  },
+  "capture": {
+    "windowBlocked": "No se pudo abrir la ventana de captura. Permite las ventanas emergentes para este sitio e inténtalo de nuevo.",
+    "presetTitle": "Elegir formato de captura",
+    "presetDescription": "Elige la resolución fija y luego empieza a grabar en una ventana nueva.",
+    "recordCta": "Grabar",
+    "recordCtaTitle": "Grabar en una ventana nueva"
+  },
+  "captureWindow": {
+    "unsupported": "Este navegador no admite la captura de pantalla.",
+    "retry": "Se canceló el uso compartido de pantalla. Haz clic en cualquier parte de esta ventana para empezar a grabar.",
+    "saved": "Guardando tu vídeo: la descarga comenzará automáticamente."
+  },
+  "midiLoad": {
+    "openTitle": "Cargar mapeos MIDI guardados",
+    "description": "Carga los mapeos MIDI de otro orbiter en este. Esto reemplaza los mapeos del orbiter actual.",
+    "loading": "Cargando…",
+    "loadingProgress": "Cargando mapeos… {{done}} de {{total}}",
+    "empty": "Aún no hay mapeos guardados en tus otros orbiters.",
+    "searchPlaceholder": "Filtrar orbiters por nombre…",
+    "noMatches": "Ningún orbiter coincide con tu filtro.",
+    "filterCount": "{{shown}} de {{total}}",
+    "fetchError": "No se pudieron cargar tus mapeos guardados.",
+    "retry": "Reintentar",
+    "mappingsOne": "{{count}} mapeo",
+    "mappingsOther": "{{count}} mapeos",
+    "load": "Cargar",
+    "loadAria": "Cargar {{name}} en este orbiter",
+    "replaceConfirmOne": "¿Reemplazar el {{count}} mapeo de este orbiter por los de «{{name}}»?",
+    "replaceConfirmOther": "¿Reemplazar los {{count}} mapeos de este orbiter por los de «{{name}}»?",
+    "replace": "Reemplazar",
+    "loadError": "No se pudo completar la carga: puede que algunos mapeos hayan cambiado.",
+    "successOne": "Se cargó {{count}} mapeo de {{name}}.",
+    "successOther": "Se cargaron {{count}} mapeos de {{name}}.",
+    "replaceShellConfirmOne": "¿Reemplazar el {{count}} mapeo de esta colección con “{{name}}”?",
+    "replaceShellConfirmOther": "¿Reemplazar los {{count}} mapeos de esta colección con “{{name}}”?",
+    "loadShellAria": "Cargar los mapeos de {{name}} en esta colección",
+    "orbiterTab": "Orbiter",
+    "collectionTab": "Colección",
+    "collectionDescription": "Carga los mapeos de otra colección (selección de slots, paginador, cajón) en esta. Esto reemplaza los mapeos actuales de la colección.",
+    "emptyCollections": "Aún no hay mapeos guardados en tus otras colecciones."
+  },
+  "autofocus": {
+    "label": "Autoenfoque",
+    "tooltip": "Autoenfoque: mover un control mapeado cambia a su dimensión"
+  },
+  "interaction": {
+    "menuLabel": "Paneles de interacción",
+    "sensors": "Sensores",
+    "cosmicLfo": "Cosmic LFO",
+    "playback": "Reproducción",
+    "jamming": "Jamming"
+  },
+  "sync": {
+    "menu": {
+      "settings": "Ajustes de sync",
+      "offset": {
+        "label": "Desfase manual de audio (ms)",
+        "aria": "Desfase manual de audio",
+        "valueAria": "Valor del desfase manual de audio",
+        "hint": "Ajusta de oído hasta que dos dispositivos de la red queden alineados."
+      },
+      "metronome": "Metrónomo",
+      "meter": {
+        "label": "Compás",
+        "aria": "Compás",
+        "numerator": "Numerador del compás",
+        "denominator": "Denominador del compás"
+      }
+    }
+  },
+  "playbackToolbar": {
+    "gridNeedsBpm": "Define el BPM para activar la cuadrícula ›",
+    "gridMarkerDisabled": "Define el BPM de la pista para activar el marcador",
+    "trackBpmEmpty": "--"
+  },
+  "tooltips": {
+    "controls": {
+      "buttons": "Consulta qué hace este control antes de pulsarlo.",
+      "knobs": "Gira o desplázate para ajustar con precisión este parámetro."
+    },
+    "buttons": {
+      "informationDropdown": "Abre el centro de información para alternar entre los monitores de motor, pista, mundo y orbitador.",
+      "dimensionDropdown": "Selector de la dimensión activa que se muestra en los controles principales.",
+      "moreDropdown": "Accede a utilidades como mapeos MIDI, enlaces para compartir y pantalla completa.",
+      "transportDropdown": "Controles principales de transporte para iniciar, pausar y detener la reproducción.",
+      "interactionDropdown": "Selector de paneles de interacción: Sensores, Cosmic LFO, Reproducción y Jamming.",
+      "syncEnable": "Activa o desactiva la sincronización de tempo usando el valor de BPM compartido.",
+      "loopToggle": "Activa o desactiva el bucle del segmento de reproducción actual.",
+      "xWaveformDropdown": "Elige la forma de onda que modula el eje X.",
+      "yWaveformDropdown": "Elige la forma de onda que modula el eje Y.",
+      "zWaveformDropdown": "Elige la forma de onda que modula el eje Z.",
+      "xExoDropdown": "Asigna una fuente de datos de exoplaneta para impulsar el eje X.",
+      "yExoDropdown": "Asigna una fuente de datos de exoplaneta para impulsar el eje Y.",
+      "zExoDropdown": "Asigna una fuente de datos de exoplaneta para impulsar el eje Z."
+    },
+    "sliders": {
+      "volume": "Volumen maestro del Deck I. Arrastra para subir o bajar el nivel de salida."
+    },
+    "playbackToolbar": {
+      "gridMarker": "Define la posición inicial de la cuadrícula desde el punto actual de reproducción.",
+      "loopIn": "Guarda la posición actual como inicio del bucle.",
+      "loopOut": "Guarda la posición actual como final del bucle.",
+      "loopActive": "Activa o desactiva el bucle del rango seleccionado.",
+      "loopSnap": "Ajusta los puntos del bucle y los tamaños de bucle a la cuadrícula temporal activa.",
+      "loopSize": "Redimensiona el bucle seleccionado a esta longitud musical usando la cuadrícula BPM actual.",
+      "trackBpm": "Define el BPM de la pista que usan GRID 1 y las herramientas de tamaño de bucle."
+    },
+    "switches": {
+      "cosmicToggle": {
+        "x": "Activa o desactiva la modulación del Cosmic LFO en el eje X.",
+        "y": "Activa o desactiva la modulación del Cosmic LFO en el eje Y.",
+        "z": "Activa o desactiva la modulación del Cosmic LFO en el eje Z."
+      },
+      "sensorToggle": {
+        "x": "Asigna los sensores del dispositivo para controlar el eje X.",
+        "y": "Asigna los sensores del dispositivo para controlar el eje Y.",
+        "z": "Asigna los sensores del dispositivo para controlar el eje Z."
+      },
+      "multiplierHalf": {
+        "x": "Reduce a la mitad la frecuencia del Cosmic LFO que impulsa el eje X.",
+        "y": "Reduce a la mitad la frecuencia del Cosmic LFO que impulsa el eje Y.",
+        "z": "Reduce a la mitad la frecuencia del Cosmic LFO que impulsa el eje Z."
+      },
+      "multiplierDouble": {
+        "x": "Duplica la frecuencia del Cosmic LFO que impulsa el eje X.",
+        "y": "Duplica la frecuencia del Cosmic LFO que impulsa el eje Y.",
+        "z": "Duplica la frecuencia del Cosmic LFO que impulsa el eje Z."
+      }
+    },
+    "knobs": {
+      "syncBpm": "Referencia de BPM compartida que usan los controles de sincronización de tempo.",
+      "axis": {
+        "x": "Ajusta con precisión la profundidad de modulación del eje X.",
+        "y": "Ajusta con precisión la profundidad de modulación del eje Y.",
+        "z": "Ajusta con precisión la profundidad de modulación del eje Z."
+      },
+      "cosmicAmplitude": {
+        "x": "Define qué tan profundo actúa el Cosmic LFO sobre el eje X.",
+        "y": "Define qué tan profundo actúa el Cosmic LFO sobre el eje Y.",
+        "z": "Define qué tan profundo actúa el Cosmic LFO sobre el eje Z."
+      },
+      "manualFrequency": {
+        "x": "Marca la frecuencia manual del Cosmic LFO para el eje X.",
+        "y": "Marca la frecuencia manual del Cosmic LFO para el eje Y.",
+        "z": "Marca la frecuencia manual del Cosmic LFO para el eje Z."
+      }
+    }
+  },
+  "panels": {
+    "jamming": "Jamming",
+    "midi": "MIDI",
+    "sensors": "Sensores",
+    "cosmicLfo": "Cosmic LFO",
+    "playback": "Reproducción"
+  },
+  "infoRows": {
+    "track": "Audio",
+    "artists": "Artistas",
+    "by": "por",
+    "rights": "Derechos",
+    "releaseDate": "Fecha de lanzamiento",
+    "world": "Mundo",
+    "exoplanet": "Exoplaneta",
+    "cpd": "CPD",
+    "stellarL": "L estelar (L☉)",
+    "massMj": "Masa (MJ)",
+    "moons": "Lunas",
+    "orbiter": "Orbitador"
+  },
+  "cosmicLfoMenu": {
+    "waveforms": {
+      "sine": "Seno",
+      "square": "Cuadrada",
+      "sawtooth": "Diente de sierra",
+      "triangle": "Triangular"
+    },
+    "sources": {
+      "manualFrequency": "Frecuencia",
+      "minimumCosmicLfo": "Cosmic LFO",
+      "stellarLuminosityLsun": "Luminosidad estelar (L☉)",
+      "frequencyCpd": "Frecuencia (CPD)",
+      "mass": "Masa"
+    }
+  },
+  "sensors": {
+    "modal": {
+      "connectTitle": "Conectar sensor externo",
+      "connectDescription": "Escanea el código QR con tu dispositivo móvil para vincularlo como sensor externo.",
+      "manualEntry": "O ingresa esta URL manualmente:",
+      "reconnectTitle": "Reconectar sensor externo",
+      "disconnectedHeading": "Dispositivo móvil desconectado",
+      "disconnectedDescription": "Tu dispositivo móvil se ha desconectado.<br> Vuelve a abrir el Cliente Móvil de Sensores para reintentar automáticamente, o escanea este código QR otra vez para conectarte desde una nueva pestaña.",
+      "sharedChoice": {
+        "useConnected": {
+          "title": "Usar sensor conectado",
+          "description": "Reutiliza el sensor móvil que ya está conectado en esta sesión del navegador."
+        },
+        "connectNew": {
+          "title": "Conectar nuevo dispositivo móvil",
+          "description": "Vincula un nuevo dispositivo móvil solo para este Orbiter."
+        }
+      }
+    }
+  },
+  "editPanel": {
+    "window": {
+      "title": "Orbitador"
+    },
+    "folders": {
+      "engine": "Motor",
+      "dimensions": "Dimensiones"
+    },
+    "controls": {
+      "dimension": "Dimensión"
+    },
+    "design": {
+      "folderTitle": "Panel",
+      "themePreset": "Tema predefinido",
+      "colorPrimary": "Primario",
+      "colorSecondary": "Secundario",
+      "colorC": "Seleccionado",
+      "roundedCorners": "Esquinas redondeadas",
+      "frameBorderWidth": "Grosor del borde del marco",
+      "fontFamily": "Familia tipográfica",
+      "customTheme": "Personalizado"
+    },
+    "dimension": {
+      "none": "Ninguna"
+    },
+    "singletonLabels": {
+      "default": "Este efecto",
+      "speed": "Velocidad",
+      "nebulaReverb": "Reverberación Nebulosa",
+      "jcReverb": "Reverberación JC"
+    },
+    "moduleOption": {
+      "inUse": "{{label}} (en uso)",
+      "unique": "{{label}} (único)",
+      "uniqueUnavailable": "{{label}} (único - no disponible)"
+    },
+    "rack": {
+      "moduleSelect": "{{slot}} Módulo",
+      "unitSuffix": " ({{unit}})",
+      "minLabel": "{{slot}} Min ({{value}}){{unit}}",
+      "maxLabel": "{{slot}} Max ({{value}}){{unit}}",
+      "equilibriumLabel": "{{slot}} Equilibrio ({{value}}){{unit}}"
+    },
+    "engine": {
+      "lockedNotice": "Estos módulos necesitan la pista completa en memoria.",
+      "lockedLoad": "Cargar pista completa",
+      "lockedLoading": "Cargando la pista completa…",
+      "lockedRetry": "Error al cargar — toca para reintentar"
+    }
+  },
+  "entity": {
+    "unavailable": {
+      "entangled-world": {
+        "archived": "Mundo original archivado — usando modo de respaldo.",
+        "deleted": "Mundo original eliminado — usando modo de respaldo.",
+        "missing": "Mundo original no encontrado — usando modo de respaldo.",
+        "reported": "Mundo original reportado — usando modo de respaldo.",
+        "privacy": "Mundo original privado — usando modo de respaldo.",
+        "moderated": "Mundo original moderado — usando modo de respaldo.",
+        "suspended": "Mundo original suspendido — usando modo de respaldo.",
+        "blocked": "Este mundo no está disponible.",
+        "forbidden": "Este mundo no está disponible.",
+        "invalid": "Mundo original no disponible — usando modo de respaldo."
+      },
+      "orbiter": {
+        "archived": "Orbitador original archivado — usando modo de respaldo.",
+        "deleted": "Orbitador original eliminado — usando modo de respaldo.",
+        "missing": "Orbitador original no encontrado — usando modo de respaldo.",
+        "reported": "Orbitador original reportado — usando modo de respaldo.",
+        "privacy": "Orbitador original privado — usando modo de respaldo.",
+        "moderated": "Orbitador original moderado — usando modo de respaldo.",
+        "suspended": "Orbitador original suspendido — usando modo de respaldo.",
+        "blocked": "Este orbitador no está disponible.",
+        "forbidden": "Este orbitador no está disponible.",
+        "invalid": "Orbitador original no disponible — usando modo de respaldo."
+      }
+    }
+  },
+  "entangledWorldVideo": {
+    "archived": "Mundo original archivado — usando modo de respaldo.",
+    "deleted": "Mundo original eliminado — usando modo de respaldo.",
+    "missing": "Mundo original no encontrado — usando modo de respaldo.",
+    "reported": "Mundo original reportado — usando modo de respaldo.",
+    "privacy": "Mundo original privado — usando modo de respaldo.",
+    "moderated": "Mundo original moderado — usando modo de respaldo.",
+    "suspended": "Mundo original suspendido — usando modo de respaldo.",
+    "blocked": "Este mundo no está disponible.",
+    "forbidden": "Este mundo no está disponible.",
+    "invalid": "Mundo original no disponible — usando modo de respaldo."
+  },
+  "notifications": {
+    "orbiterFallback": "Orbitador predeterminado cargado",
+    "deviceConnectionError": "No se puede conectar al dispositivo",
+    "midiActivationError": "Error al activar el panel MIDI",
+    "sensorsUnavailable": "Los sensores no se pueden activar",
+    "apiError": "Error al cargar datos",
+    "sensorPermissionDenied": "Permiso denegado para sensores internos",
+    "externalSensorsActivated": "Sensores externos activados a través del Cliente Móvil",
+    "externalSensorsFailed": "Error al inicializar sensores externos",
+    "noSensorsAvailable": "No hay sensores disponibles",
+    "mobileDeviceDisconnected": "Dispositivo desconectado.",
+    "speedControlDisabledLongMobile": "En móvil, los cambios de velocidad se desactivan temporalmente para mantener la reproducción estable en esta pista.",
+    "connectionLostAnotherInstance": "Conexión perdida: otra instancia se conectó.",
+    "qrGenerationError": "Error al generar el código QR.",
+    "midiActivationFailed": "Error al activar MIDI: {{error}}",
+    "midiNotSupported": "API Web MIDI no compatible en este entorno",
+    "midiAccessFailed": "Error al acceder a MIDI: {{error}}",
+    "midiAccessNotInitialized": "El acceso MIDI no está inicializado. No se pueden habilitar entradas",
+    "midiNoInputsFound": "No se encontraron entradas MIDI. Por favor conecte un dispositivo MIDI",
+    "midiMappingOrbiterError": "No se puede determinar el orbitador para el mapeo MIDI",
+    "midiMappingSaveFailed": "Error al guardar el mapeo MIDI. Por favor verifique su conexión e intente de nuevo",
+    "midiMappingRemovalOrbiterError": "No se puede determinar el orbitador para eliminar el mapeo MIDI",
+    "midiMappingRemovalFailed": "Error al eliminar el mapeo MIDI remotamente. Por favor intente de nuevo",
+    "midiMappingCleared": "Mapeo MIDI eliminado para '{{identifier}}'",
+    "midiMappingNotFound": "No existe mapeo MIDI para '{{identifier}}'",
+    "midiLearnNotActivated": "MIDI no está activado. No se puede entrar en modo de aprendizaje MIDI",
+    "midiLearnActivated": "Modo de aprendizaje MIDI activado. Haga clic en un control para asignar MIDI",
+    "bufferedLoadFailed": "No se pudo cargar la pista completa — sigue en streaming y los controles quedan bloqueados. Toca desbloquear para reintentar."
+  },
+  "queueMode": {
+    "signInRequired": "Inicia sesión para reproducir tu cola.",
+    "empty": "Tu cola de reproducción está vacía.",
+    "loadFailed": "No se pudo cargar tu cola de reproducción."
+  },
+  "studio": {
+    "filters": {
+      "shown": "Tarjetas de {{label}} visibles — pulsa para ocultarlas",
+      "hidden": "Tarjetas de {{label}} ocultas — pulsa para mostrarlas",
+      "track": "audio",
+      "orbiter": "orbitador",
+      "world": "mundo"
+    },
+    "cruiseOn": "Crucero activado: las pistas se reproducen una tras otra",
+    "cruiseOff": "Crucero desactivado: la reproducción nunca avanza sola",
+    "fullSessionsOn": "Sesiones completas activado: al soltar se carga la tarjeta con sus entidades originales",
+    "fullSessionsOff": "Sesiones completas desactivado: al soltar solo se cambia la parte propia de la tarjeta",
+    "tooltipsOn": "Ayudas activadas",
+    "tooltipsOff": "Ayudas desactivadas",
+    "scrollLeft": "Desplazar a la izquierda",
+    "scrollRight": "Desplazar a la derecha",
+    "resizeDrawer": "Redimensionar el cajón",
+    "closeCards": "Cerrar tarjetas",
+    "official": "Publicación oficial",
+    "dock": {
+      "prev": "Ant.",
+      "prevAria": "Orbitador anterior",
+      "next": "Sig.",
+      "nextAria": "Orbitador siguiente",
+      "layout": "Diseño",
+      "layoutAria": "Elige cuántos orbitadores",
+      "cards": "Tarjetas",
+      "hideCards": "Ocultar tarjetas",
+      "showCards": "Mostrar tarjetas",
+      "monitorLoaded": "Orbitador {{letter}}: {{title}}",
+      "monitorLoadedFallback": "pista cargada",
+      "monitorEmpty": "Orbitador {{letter}} (vacío)",
+      "orbiterCountOne": "1 orbitador",
+      "orbiterCountMany": "{{count}} orbitadores",
+      "leaveCollection": "Salir de la colección"
+    },
+    "stage": {
+      "emptyHint": "Suelta una tarjeta aquí, o tócala dos veces para cargarla",
+      "removeFromStage": "Quitar el orbitador de la posición {{number}}"
+    },
+    "confirm": {
+      "leaveTitle": "¿Salir de esta colección?",
+      "leaveBody": "Tu arreglo actual no se guardará.",
+      "shrinkTitle": "¿Reducir el diseño?",
+      "shrinkBodyOne": "Esto quita 1 orbitador cargado.",
+      "shrinkBodyMany": "Esto quita {{count}} orbitadores cargados.",
+      "cancel": "Cancelar",
+      "continue": "Continuar"
+    }
+  },
+  "camera": {
+    "orbitMoon": "Orbitar la luna",
+    "orbitWorld": "Orbitar el mundo"
+  }
+}

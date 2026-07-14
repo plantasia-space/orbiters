@@ -1,0 +1,200 @@
+export const EFFECT_MANIFEST = Object.freeze({
+  id: 'tone.pitchshift',
+  label: 'Pitch Shifter',
+  version: '1.1.1',
+  inputParam: 'inputParam',
+  dimensionId: 'EW::I',
+  dimensionLabel: 'EW::I',
+  defaults: Object.freeze({
+    pitch: 0,
+    feedback: 0,
+    wet: 0.5,
+    windowSize: 0.06,
+  }),
+  userParamSpec: Object.freeze({
+    id: 'inputParam',
+    label: 'Nebula Slide',
+    units: '%',
+    range: Object.freeze({ min: -100, max: 100 }),
+  }),
+  modules: Object.freeze([
+    Object.freeze({
+      id: 'down',
+      label: 'Nebula Slide Down',
+      description: 'Subharmonic dive; bass octave / monster voice.',
+      dimension: 'EW::I',
+      fixed: Object.freeze({}),
+      valueRange: Object.freeze({ min: -100, max: 100, units: '%' }),
+      initialRange: Object.freeze({ min: -60, max: 60, equilibrium: 0 }),
+      segments: Object.freeze({
+        negative: Object.freeze({
+          id: 'pitchshift.down::submerge',
+          label: 'Submerge',
+          description: 'Left sweep now does the heavy dive: immediate plunge with thick feedback.',
+          parameterMappings: Object.freeze({
+            pitch: Object.freeze({ min: -1, max: -24, transform: 'hardEdge' }),
+            feedback: Object.freeze({ min: 0, max: 0.45, transform: 'easeIn' }),
+            wet: Object.freeze({ min: 0, max: 1, transform: 'easeIn' }),
+          }),
+        }),
+        positive: Object.freeze({
+          id: 'pitchshift.down::rumble',
+          label: 'Rumble',
+          description: 'Right sweep becomes a restrained wobble hovering around -7 for layered grit.',
+          parameterMappings: Object.freeze({
+            pitch: Object.freeze({ min: 0, max: -7, transform: 'stepLock7' }),
+            feedback: Object.freeze({ min: 0, max: 0.35 }),
+            wet: Object.freeze({ min: 0, max: 0.5 }),
+          }),
+        }),
+      }),
+      control: Object.freeze({
+        mode: 'hybrid',
+        audioParam: 'pitch',
+        provider: 'node',
+        smoothing: Object.freeze({
+          defaultRamp: 0.08,
+          minRamp: 0.01,
+          maxRamp: 0.6,
+          curve: 'linear',
+        }),
+        signalRange: Object.freeze({ min: -100, max: 100, transform: 'easeOut' }),
+        secondaryParameters: Object.freeze(['feedback', 'wet']),
+      }),
+    }),
+    Object.freeze({
+      id: 'up',
+      label: 'Nebula Slide Up',
+      description: 'Alien shimmer; chipmunk gloss.',
+      dimension: 'EW::I',
+      fixed: Object.freeze({}),
+      valueRange: Object.freeze({ min: -100, max: 100, units: '%' }),
+      initialRange: Object.freeze({ min: -60, max: 80, equilibrium: 0 }),
+      segments: Object.freeze({
+        negative: Object.freeze({
+          id: 'pitchshift.up::subtle-down',
+          label: 'Subtle Down',
+          description: 'Left sweep introduces a gentle downward glide for contrast.',
+          parameterMappings: Object.freeze({
+            pitch: Object.freeze({ min: 0, max: -12, transform: 'easeOut' }),
+            feedback: Object.freeze({ min: 0, max: 0.4 }),
+            wet: Object.freeze({ min: 0, max: 0.6 }),
+          }),
+        }),
+        positive: Object.freeze({
+          id: 'pitchshift.up::rise',
+          label: 'Rise',
+          description: 'Right sweep climbs two octaves with sharper resonance.',
+          parameterMappings: Object.freeze({
+            pitch: Object.freeze({ min: 0, max: 24, transform: 'easeIn' }),
+            feedback: Object.freeze({ min: 0.4, max: 0.55 }),
+            wet: Object.freeze({ min: 0.6, max: 1 }),
+          }),
+        }),
+      }),
+      control: Object.freeze({
+        mode: 'hybrid',
+        audioParam: 'pitch',
+        provider: 'node',
+        smoothing: Object.freeze({
+          defaultRamp: 0.08,
+          minRamp: 0.01,
+          maxRamp: 0.6,
+          curve: 'linear',
+        }),
+        signalRange: Object.freeze({ min: -100, max: 100, transform: 'easeIn' }),
+        secondaryParameters: Object.freeze(['feedback', 'wet']),
+      }),
+    }),
+    Object.freeze({
+      id: 'fifth',
+      label: 'Nebula Slide Fifth',
+      description: 'Musical harmony centered on a perfect fifth.',
+      dimension: 'EW::I',
+      fixed: Object.freeze({}),
+      valueRange: Object.freeze({ min: -100, max: 100, units: '%' }),
+      initialRange: Object.freeze({ min: -60, max: 60, equilibrium: 0 }),
+      segments: Object.freeze({
+        negative: Object.freeze({
+          id: 'pitchshift.fifth::lower',
+          label: 'Lower Fifth',
+          description: 'Blend down to -7 semitones for inverse harmonies.',
+          parameterMappings: Object.freeze({
+            pitch: Object.freeze({ min: 0, max: -7, transform: 'stepLock7' }),
+            feedback: Object.freeze({ min: 0.1, max: 0.5 }),
+            wet: Object.freeze({ min: 0.2, max: 0.8 }),
+          }),
+        }),
+        positive: Object.freeze({
+          id: 'pitchshift.fifth::upper',
+          label: 'Upper Fifth',
+          description: 'Glide to +7 semitones with a lock around the harmony point.',
+          parameterMappings: Object.freeze({
+            pitch: Object.freeze({ min: 0, max: 7, transform: 'stepLock7' }),
+            feedback: Object.freeze({ min: 0.1, max: 0.5 }),
+            wet: Object.freeze({ min: 0.2, max: 0.8 }),
+          }),
+        }),
+      }),
+      control: Object.freeze({
+        mode: 'hybrid',
+        audioParam: 'pitch',
+        provider: 'node',
+        smoothing: Object.freeze({
+          defaultRamp: 0.08,
+          minRamp: 0.01,
+          maxRamp: 0.6,
+          curve: 'linear',
+        }),
+        signalRange: Object.freeze({ min: -100, max: 100, transform: 'stepLock7' }),
+        secondaryParameters: Object.freeze(['feedback', 'wet']),
+      }),
+    }),
+    Object.freeze({
+      id: 'octave',
+      label: 'Nebula Slide Octave',
+      description: 'Classic octaver: snaps to -12/+12 quickly.',
+      dimension: 'EW::I',
+      fixed: Object.freeze({}),
+      valueRange: Object.freeze({ min: -100, max: 100, units: '%' }),
+      initialRange: Object.freeze({ min: -100, max: 100, equilibrium: 0 }),
+      segments: Object.freeze({
+        negative: Object.freeze({
+          id: 'pitchshift.octave::down',
+          label: 'Octave Down',
+          description: 'Left sweep races to -12 with aggressive resonance.',
+          parameterMappings: Object.freeze({
+            pitch: Object.freeze({ min: 0, max: -12, transform: 'hardEdge' }),
+            feedback: Object.freeze({ min: 0.2, max: 0.6 }),
+            wet: Object.freeze({ min: 0.5, max: 1 }),
+          }),
+        }),
+        positive: Object.freeze({
+          id: 'pitchshift.octave::up',
+          label: 'Octave Up',
+          description: 'Right sweep launches to +12 with the same hard-edge response.',
+          parameterMappings: Object.freeze({
+            pitch: Object.freeze({ min: 0, max: 12, transform: 'hardEdge' }),
+            feedback: Object.freeze({ min: 0.2, max: 0.6 }),
+            wet: Object.freeze({ min: 0.5, max: 1 }),
+          }),
+        }),
+      }),
+      control: Object.freeze({
+        mode: 'hybrid',
+        audioParam: 'pitch',
+        provider: 'node',
+        smoothing: Object.freeze({
+          defaultRamp: 0.08,
+          minRamp: 0.01,
+          maxRamp: 0.6,
+          curve: 'linear',
+        }),
+        signalRange: Object.freeze({ min: -100, max: 100, transform: 'hardEdge' }),
+        secondaryParameters: Object.freeze(['feedback', 'wet']),
+      }),
+    }),
+  ]),
+});
+
+export default EFFECT_MANIFEST;

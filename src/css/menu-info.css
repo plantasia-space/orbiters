@@ -1,0 +1,30 @@
+/* Define size variables for button groups and icons */
+:root {
+    --size-upper-buttons: clamp(10vmin, 10vmin, 100vmin);
+    --size-vertical-menu-buttons: clamp(7vmin, 7vmin, 70vmin);
+    --size-lower-buttons-side: clamp(12vmin, 15vmin, 100vmin);
+    --icon-size: 5vmin;                         /* Legacy icon size for non top-bar buttons */
+    --top-bar-button-size: clamp(2.95rem, 5.6vmin, 3.85rem);
+    --top-bar-icon-size: clamp(1.5rem, 3.2vmin, 2.35rem);
+    --top-bar-item-gap: clamp(0.35rem, 0.75vw, 0.7rem);
+    --top-bar-inactive-ink: var(--color1);
+    --top-bar-active-ink: var(--highlight-color);
+    --close-icon-size: 20px;                    /* Grid close button icon */
+    --button-hover-color: color-mix(in srgb, var(--color1) 77%, transparent); /* dynamic color1 with alpha */
+}
+
+/* Icons inside buttons */
+.button-icon {
+    width: var(--icon-size);
+    height: var(--icon-size);
+    display: inline-block;
+}
+
+.dropdown-item,
+.dropdown-item:hover,
+.dropdown-item:focus,
+.dropdown-item:active,
+.dropdown-item span {
+    text-decoration: none !important;
+}
+

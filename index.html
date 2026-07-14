@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Orbiters</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <!-- Brand TITLE webfont (Orbit). The design-lib maps `--font-title: 'Orbit'` (tokens.css) but does
+       NOT bundle the @font-face into dist/styles.css — consumers own their font loading. The ONLY
+       play-UI element on `--font-title` is the dimension buttons, which render roman numerals
+       (I/II/III…/X → glyphs I, V, X) with a digit fallback. So instead of the full Orbit family we
+       SUBSET it to just those glyphs via the Google Fonts `&text=` param — a few-KB download that
+       still scales crisply as real text (better than shipping the whole font or hand-drawn SVGs,
+       which lose text semantics + need new assets per dimension). Preconnected + swap = non-blocking. -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbit:wght@400;700&text=IVX0123456789&display=swap">
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="/src/css/style.css">
+  <script>
+    (function () {
+      // Vite substitutes %VITE_HERBARIUM_BASE% at build time. If the env var is
+      // undefined it leaves the literal token in place, so only publish a real,
+      // substituted base — never the literal "%VITE_HERBARIUM_BASE%" — so a missing
+      // var can't poison the runtime asset/audio resolver.
+      var base = '%VITE_HERBARIUM_BASE%';
+      if (base && base.indexOf('%') === -1) {
+        window.__PUBLIC_HERBARIUM_BASE__ = window.VITE_PUBLIC_HERBARIUM_BASE = base;
+        window.__HERBARIUM_BASE__ = window.VITE_HERBARIUM_BASE = base;
+      }
+    })();
+  </script>
+</head>
+
+<body data-ui-ready="false">
+
+  <!-- Silent audio element used to unlock device audio output on first interaction -->
+  <audio
+    id="silent-audio-unlock"
+    data-silent-audio-unlock
+    preload="auto"
+    playsinline
+    src="/assets/sounds/silent.mp3"
+    style="display: none;">
+  </audio>
+
+  <div class="ratio-frame">
+    <!-- Canvas for Three.js -->
+    <canvas id="canvas3D" class="webgl"></canvas>
+  </div>
+
+  <!-- Boot loading screen (populated by Main.js showLoadingScreen; shown until uiReady, before the
+       React shell mounts). Not legacy UI — React mounts after load, so this is the only boot feedback. -->
+  <div id="loading-screen"></div>
+
+  <!-- MIDI context menu (learn/delete). Opened by MidiOverlayManager when an automatable React control
+       is clicked in MIDI-learn mode (MidiContextMenu / MIDIController). Plain DOM until ported to React. -->
+  <div id="midi-context-menu" class="dropdown-menu" style="position: absolute;">
+    <a id="midi-context-learn" class="dropdown-item" href="#">Learn</a>
+    <a id="midi-context-delete" class="dropdown-item" href="#">Delete</a>
+    <a id="midi-context-close" class="dropdown-item" href="#">Close</a>
+  </div>
+
+  <!-- Hidden MIDI-learn exit hook (MidiLearnUiController); the React header shows its own exit button. -->
+  <button id="exit-midi-learn" style="display: none;">Exit MIDI Learn</button>
+
+  <!-- Universal modal: the MIDI-learn prompt (MIDIController) + generic confirm (AppNotifications).
+       Kept as plain DOM until ported to React. -->
+  <div class="modal fade" id="universalModal" tabindex="-1" aria-labelledby="universalModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="universalModalLabel"></h5>
+          <button type="button" class="btn-close" data-ui-core-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="modal-content-wrapper">
+            <!-- Content will be dynamically added here -->
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-primary" data-ui-core-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Define global -->
+  <script>
+    window.global = window;
+  </script>
+
+  <!-- Custom JS -->
+  <script>
+    (function () {
+      const apiBase = "%VITE_API_BASE%";
+      const apiVersion = "%VITE_API_VERSION%";
+      window.API_BASE = apiBase;
+      window.API_VERSION = apiVersion;
+    })();
+  </script>
+  <script type="module" src="/src/Main.js"></script>
+</body>
+
+</html>

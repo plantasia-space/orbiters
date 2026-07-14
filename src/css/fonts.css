@@ -1,0 +1,35 @@
+
+/* Space Mono Regular (Body Text - Regular) */
+@font-face {
+    font-family: 'SpaceMono';
+    src: url('/assets/fonts/SpaceMono-Regular.woff2') format('woff2'),
+         url('/assets/fonts/SpaceMono-Regular.ttf') format('truetype');
+    font-weight: 400; /* Regular */
+    font-style: normal;
+}
+/* Inter Thin (Body Text - Ultra Light) */
+@font-face {
+    font-family: 'Inter';
+    src: url('/assets/fonts/Inter-Thin.woff2') format('woff2'),
+         url('/assets/fonts/Inter-Thin.ttf') format('truetype');
+    font-weight: 200; /* Thin */
+    font-style: normal;
+}
+
+/* Inter Light (Body Text - Light) */
+@font-face {
+    font-family: 'Inter';
+    src: url('/assets/fonts/Inter-Light.woff2') format('woff2'),
+         url('/assets/fonts/Inter-Light.ttf') format('truetype');
+    font-weight: 300; /* Light */
+    font-style: normal;
+}
+
+/* Inter Regular (Body Text - Regular) */
+@font-face {
+    font-family: 'Inter';
+    src: url('/assets/fonts/Inter-Regular.woff2') format('woff2'),
+         url('/assets/fonts/Inter-Regular.ttf') format('truetype');
+    font-weight: 400; /* Regular */
+    font-style: normal;
+}

@@ -1,0 +1,434 @@
+{
+  "app": {
+    "title": "Orbiters"
+  },
+  "loading": {
+    "short": "LOADING",
+    "audio": "Loading Audio",
+    "collection": "Loading Collection...",
+    "voiceFailed": "Couldn't load this orbiter.",
+    "voiceTimeout": "This orbiter took too long to load.",
+    "queue": "Loading queue..."
+  },
+  "topBar": {
+    "informationToggle": "Information",
+    "menu": {
+      "engineMonitor": "Engine Monitor",
+      "track": "Audio",
+      "entangledWorld": "Entangled World",
+      "orbiter": "Orbiter"
+    },
+    "selectDimension": "Select Dimension",
+    "calibrateSensor": "Calibrate sensor",
+    "connectionStatus": "Device Disconnected",
+    "loopToggle": "Toggle loop playback",
+    "loopLabel": "Loop",
+    "moreOptions": "More options",
+    "moreMenu": {
+      "midi": "MIDI",
+      "tooltips": "Tooltips",
+      "share": "Share",
+      "fullscreen": "Fullscreen"
+    },
+    "grid": {
+      "close": "Close Grid"
+    }
+  },
+  "login": {
+    "cta": "Login",
+    "ariaLabel": "Login to Plantasia"
+  },
+  "common": {
+    "close": "Close",
+    "cancel": "Cancel"
+  },
+  "transport": {
+    "menuLabel": "Transport controls",
+    "play": "Play",
+    "pause": "Pause",
+    "stop": "Stop",
+    "countIn": "{{beats}} until start"
+  },
+  "capture": {
+    "windowBlocked": "Couldn't open the capture window. Allow pop-ups for this site, then try again.",
+    "presetTitle": "Choose capture format",
+    "presetDescription": "Pick the fixed resolution, then start recording in a new window.",
+    "recordCta": "Record",
+    "recordCtaTitle": "Record in a new window"
+  },
+  "captureWindow": {
+    "unsupported": "Screen capture isn't supported in this browser.",
+    "retry": "Screen sharing was dismissed. Click anywhere in this window to start recording.",
+    "saved": "Saving your video — the download will start automatically."
+  },
+  "midiLoad": {
+    "openTitle": "Load saved MIDI mappings",
+    "description": "Load another orbiter's MIDI mappings into this one. This replaces the current orbiter's mappings.",
+    "loading": "Loading…",
+    "loadingProgress": "Loading mappings… {{done}} of {{total}}",
+    "empty": "No saved mappings in your other orbiters yet.",
+    "searchPlaceholder": "Filter orbiters by name…",
+    "noMatches": "No orbiters match your filter.",
+    "filterCount": "{{shown}} of {{total}}",
+    "fetchError": "Couldn't load your saved mappings.",
+    "retry": "Try again",
+    "mappingsOne": "{{count}} mapping",
+    "mappingsOther": "{{count}} mappings",
+    "load": "Load",
+    "loadAria": "Load {{name}} into this orbiter",
+    "replaceConfirmOne": "Replace this orbiter's {{count}} mapping with “{{name}}”?",
+    "replaceConfirmOther": "Replace this orbiter's {{count}} mappings with “{{name}}”?",
+    "replace": "Replace",
+    "loadError": "Couldn't finish loading — some mappings may have changed.",
+    "successOne": "Loaded {{count}} mapping from {{name}}.",
+    "successOther": "Loaded {{count}} mappings from {{name}}.",
+    "replaceShellConfirmOne": "Replace this collection's {{count}} shell mapping with “{{name}}”?",
+    "replaceShellConfirmOther": "Replace this collection's {{count}} shell mappings with “{{name}}”?",
+    "loadShellAria": "Load {{name}} shell mappings into this collection",
+    "orbiterTab": "Orbiter",
+    "collectionTab": "Collection",
+    "collectionDescription": "Load another collection's shell mappings (slot select, pager, drawer) into this one. This replaces the current collection's shell mappings.",
+    "emptyCollections": "No saved shell mappings in your other collections yet."
+  },
+  "autofocus": {
+    "label": "Autofocus",
+    "tooltip": "Autofocus: moving a mapped control switches to its dimension"
+  },
+  "interaction": {
+    "menuLabel": "Interaction panels",
+    "sensors": "Sensors",
+    "cosmicLfo": "Cosmic LFO",
+    "playback": "Playback",
+    "jamming": "Jamming"
+  },
+  "sync": {
+    "menu": {
+      "settings": "Sync settings",
+      "offset": {
+        "label": "Manual audio offset (ms)",
+        "aria": "Manual audio offset",
+        "valueAria": "Manual audio offset value",
+        "hint": "Tune by ear until two devices in the network line up."
+      },
+      "metronome": "Metronome",
+      "meter": {
+        "label": "Meter",
+        "aria": "Time signature",
+        "numerator": "Meter numerator",
+        "denominator": "Meter denominator"
+      }
+    }
+  },
+  "playbackToolbar": {
+    "gridNeedsBpm": "Set BPM to enable grid ›",
+    "gridMarkerDisabled": "Set track BPM to enable grid marker",
+    "trackBpmEmpty": "--"
+  },
+  "tooltips": {
+    "controls": {
+      "buttons": "Preview what this control does before clicking.",
+      "knobs": "Turn or scroll to fine-tune this parameter."
+    },
+    "buttons": {
+      "informationDropdown": "Open the information hub to switch between engine, track, world, and orbiter monitors.",
+      "dimensionDropdown": "Switcher for the active dimension shown in the main controls.",
+      "moreDropdown": "Access utilities such as MIDI mappings, sharing links, and fullscreen.",
+      "transportDropdown": "Main transport controls for starting, pausing, and stopping playback.",
+      "interactionDropdown": "Switcher for the interaction panels: Sensors, Cosmic LFO, Playback, and Jamming.",
+      "syncEnable": "Enable or disable tempo sync using the shared BPM value.",
+      "loopToggle": "Toggle looping on or off for the active playback segment.",
+      "xWaveformDropdown": "Choose the waveform that modulates the X axis.",
+      "yWaveformDropdown": "Choose the waveform that modulates the Y axis.",
+      "zWaveformDropdown": "Choose the waveform that modulates the Z axis.",
+      "xExoDropdown": "Assign an exoplanet data source to drive the X axis.",
+      "yExoDropdown": "Assign an exoplanet data source to drive the Y axis.",
+      "zExoDropdown": "Assign an exoplanet data source to drive the Z axis."
+    },
+    "sliders": {
+      "volume": "Master volume for Deck I. Drag to raise or lower the output level."
+    },
+    "playbackToolbar": {
+      "gridMarker": "Set the initial grid position from the current playback point.",
+      "loopIn": "Store the current position as the loop start point.",
+      "loopOut": "Store the current position as the loop end point.",
+      "loopActive": "Enable or disable looping for the selected range.",
+      "loopSnap": "Snap loop points and loop-size actions to the active timing grid.",
+      "loopSize": "Resize the selected loop to this musical length using the current BPM grid.",
+      "trackBpm": "Set the track BPM used by GRID 1 and loop-size tools."
+    },
+    "switches": {
+      "cosmicToggle": {
+        "x": "Enable or disable Cosmic LFO modulation on the X axis.",
+        "y": "Enable or disable Cosmic LFO modulation on the Y axis.",
+        "z": "Enable or disable Cosmic LFO modulation on the Z axis."
+      },
+      "sensorToggle": {
+        "x": "Route device sensors to control the X axis.",
+        "y": "Route device sensors to control the Y axis.",
+        "z": "Route device sensors to control the Z axis."
+      },
+      "multiplierHalf": {
+        "x": "Halve the Cosmic LFO frequency driving the X axis.",
+        "y": "Halve the Cosmic LFO frequency driving the Y axis.",
+        "z": "Halve the Cosmic LFO frequency driving the Z axis."
+      },
+      "multiplierDouble": {
+        "x": "Double the Cosmic LFO frequency driving the X axis.",
+        "y": "Double the Cosmic LFO frequency driving the Y axis.",
+        "z": "Double the Cosmic LFO frequency driving the Z axis."
+      }
+    },
+    "knobs": {
+      "syncBpm": "Shared BPM reference used by tempo sync controls.",
+      "axis": {
+        "x": "Fine-tune the modulation depth for the X axis.",
+        "y": "Fine-tune the modulation depth for the Y axis.",
+        "z": "Fine-tune the modulation depth for the Z axis."
+      },
+      "cosmicAmplitude": {
+        "x": "Set how deep the Cosmic LFO pushes the X axis.",
+        "y": "Set how deep the Cosmic LFO pushes the Y axis.",
+        "z": "Set how deep the Cosmic LFO pushes the Z axis."
+      },
+      "manualFrequency": {
+        "x": "Dial in a manual Cosmic LFO frequency for the X axis.",
+        "y": "Dial in a manual Cosmic LFO frequency for the Y axis.",
+        "z": "Dial in a manual Cosmic LFO frequency for the Z axis."
+      }
+    }
+  },
+  "panels": {
+    "jamming": "Jamming",
+    "midi": "MIDI",
+    "sensors": "Sensors",
+    "cosmicLfo": "Cosmic LFO",
+    "playback": "Playback"
+  },
+  "infoRows": {
+    "track": "Track",
+    "artists": "Artists",
+    "by": "by",
+    "rights": "Rights",
+    "releaseDate": "Release date",
+    "world": "World",
+    "exoplanet": "Exoplanet",
+    "cpd": "CPD",
+    "stellarL": "Stellar L⊙",
+    "massMj": "Mass (MJ)",
+    "moons": "Moons",
+    "orbiter": "Orbiter"
+  },
+  "cosmicLfoMenu": {
+    "waveforms": {
+      "sine": "Sine",
+      "square": "Square",
+      "sawtooth": "Sawtooth",
+      "triangle": "Triangle"
+    },
+    "sources": {
+      "manualFrequency": "Frequency",
+      "minimumCosmicLfo": "Cosmic LFO",
+      "stellarLuminosityLsun": "Stellar Luminosity (L☉)",
+      "frequencyCpd": "Frequency (CPD)",
+      "mass": "Mass"
+    }
+  },
+  "sensors": {
+    "modal": {
+      "connectTitle": "Connect External Sensor",
+      "connectDescription": "Scan the QR code with your mobile device to pair it as an external sensor.",
+      "manualEntry": "Or enter this URL manually:",
+      "reconnectTitle": "Reconnect External Sensor",
+      "disconnectedHeading": "Mobile Device Disconnected",
+      "disconnectedDescription": "Your mobile device has been disconnected.<br> Re-open the Mobile Sensor Client to retry automatically, or scan this QR code again to connect from a new tab.",
+      "sharedChoice": {
+        "useConnected": {
+          "title": "Use Connected Sensor",
+          "description": "Reuse the mobile sensor already connected in this browser session."
+        },
+        "connectNew": {
+          "title": "Connect New Mobile Device",
+          "description": "Pair a new mobile device just for this Orbiter."
+        }
+      }
+    }
+  },
+  "editPanel": {
+    "window": {
+      "title": "Orbiter"
+    },
+    "folders": {
+      "engine": "Engine",
+      "dimensions": "Dimensions"
+    },
+    "controls": {
+      "dimension": "Dimension"
+    },
+    "design": {
+      "folderTitle": "Panel",
+      "themePreset": "Theme Preset",
+      "colorPrimary": "Primary",
+      "colorSecondary": "Secondary",
+      "colorC": "Selected",
+      "roundedCorners": "Rounded Corners",
+      "frameBorderWidth": "Frame Border Width",
+      "fontFamily": "Font Family",
+      "customTheme": "Custom"
+    },
+    "dimension": {
+      "none": "None"
+    },
+    "singletonLabels": {
+      "default": "This effect",
+      "speed": "Speed",
+      "nebulaReverb": "Nebula Reverb",
+      "jcReverb": "JC Reverb"
+    },
+    "moduleOption": {
+      "inUse": "{{label}} (in use)",
+      "unique": "{{label}} (unique)",
+      "uniqueUnavailable": "{{label}} (unique - unavailable)"
+    },
+    "rack": {
+      "moduleSelect": "{{slot}} Module",
+      "unitSuffix": " ({{unit}})",
+      "minLabel": "{{slot}} Min ({{value}}){{unit}}",
+      "maxLabel": "{{slot}} Max ({{value}}){{unit}}",
+      "equilibriumLabel": "{{slot}} Equilibrium ({{value}}){{unit}}"
+    },
+    "engine": {
+      "lockedNotice": "These modules need the full track in memory.",
+      "lockedLoad": "Load full track",
+      "lockedLoading": "Loading full track…",
+      "lockedRetry": "Load failed — tap to retry"
+    }
+  },
+  "entity": {
+    "unavailable": {
+      "entangled-world": {
+        "archived": "Original world archived — fallback in use.",
+        "deleted": "Original world deleted — fallback in use.",
+        "missing": "Original world not found — fallback in use.",
+        "reported": "Original world reported — fallback in use.",
+        "privacy": "Original world private — fallback in use.",
+        "moderated": "Original world moderated — fallback in use.",
+        "suspended": "Original world suspended — fallback in use.",
+        "blocked": "This world is unavailable.",
+        "forbidden": "This world is unavailable.",
+        "invalid": "Original world unavailable — fallback in use."
+      },
+      "orbiter": {
+        "archived": "Original orbiter archived — fallback in use.",
+        "deleted": "Original orbiter deleted — fallback in use.",
+        "missing": "Original orbiter not found — fallback in use.",
+        "reported": "Original orbiter reported — fallback in use.",
+        "privacy": "Original orbiter private — fallback in use.",
+        "moderated": "Original orbiter moderated — fallback in use.",
+        "suspended": "Original orbiter suspended — fallback in use.",
+        "blocked": "This orbiter is unavailable.",
+        "forbidden": "This orbiter is unavailable.",
+        "invalid": "Original orbiter unavailable — fallback in use."
+      }
+    }
+  },
+  "entangledWorldVideo": {
+    "archived": "Original world archived — fallback in use.",
+    "deleted": "Original world deleted — fallback in use.",
+    "missing": "Original world not found — fallback in use.",
+    "reported": "Original world reported — fallback in use.",
+    "privacy": "Original world private — fallback in use.",
+    "moderated": "Original world moderated — fallback in use.",
+    "suspended": "Original world suspended — fallback in use.",
+    "blocked": "This world is unavailable.",
+    "forbidden": "This world is unavailable.",
+    "invalid": "Original world unavailable — fallback in use."
+  },
+  "notifications": {
+    "orbiterFallback": "Loaded default orbiter",
+    "deviceConnectionError": "Cannot connect to device",
+    "midiActivationError": "Error activating MIDI panel",
+    "sensorsUnavailable": "Sensors cannot be activated",
+    "apiError": "Failed to load data",
+    "sensorPermissionDenied": "Permission denied for internal sensors",
+    "externalSensorsActivated": "External sensors activated via Mobile Client",
+    "externalSensorsFailed": "Failed to initialize external sensors",
+    "noSensorsAvailable": "No sensors available",
+    "mobileDeviceDisconnected": "Mobile device disconnected.",
+    "speedControlDisabledLongMobile": "On mobile, speed changes are temporarily disabled to keep playback stable on this track.",
+    "connectionLostAnotherInstance": "Connection lost: Another instance connected.",
+    "qrGenerationError": "Error generating QR code.",
+    "midiActivationFailed": "MIDI activation failed: {{error}}",
+    "midiNotSupported": "Web MIDI API not supported in this environment",
+    "midiAccessFailed": "Failed to access MIDI: {{error}}",
+    "midiAccessNotInitialized": "MIDI access is not initialized. Cannot enable inputs",
+    "midiNoInputsFound": "No MIDI inputs found. Please connect a MIDI device",
+    "midiMappingOrbiterError": "Unable to determine orbiter for MIDI mapping",
+    "midiMappingSaveFailed": "Failed to save MIDI mapping. Please check your connection and try again",
+    "midiMappingRemovalOrbiterError": "Unable to determine orbiter for MIDI mapping removal",
+    "midiMappingRemovalFailed": "Failed to remove MIDI mapping remotely. Please retry",
+    "midiMappingCleared": "Cleared MIDI mapping for '{{identifier}}'",
+    "midiMappingNotFound": "No MIDI mapping exists for '{{identifier}}'",
+    "midiLearnNotActivated": "MIDI is not activated. Cannot enter MIDI Learn mode",
+    "midiLearnActivated": "MIDI Learn mode activated. Click on a control to assign MIDI",
+    "bufferedLoadFailed": "Couldn't load the full track — still streaming, controls stay locked. Tap unlock to try again."
+  },
+  "queueMode": {
+    "signInRequired": "Sign in to play your queue.",
+    "empty": "Your queue is empty.",
+    "loadFailed": "Couldn't load your queue."
+  },
+  "studio": {
+    "filters": {
+      "shown": "{{label}} cards shown — click to hide them",
+      "hidden": "{{label}} cards hidden — click to show them",
+      "track": "Audio",
+      "orbiter": "Orbiter",
+      "world": "World"
+    },
+    "cruiseOn": "Cruise on: tracks play one after another",
+    "cruiseOff": "Cruise off: playback never advances by itself",
+    "fullSessionsOn": "Full sessions on: a drop loads the card with its original entities",
+    "fullSessionsOff": "Full sessions off: a drop swaps only the card into the playing deck",
+    "tooltipsOn": "Help tooltips on",
+    "tooltipsOff": "Help tooltips off",
+    "scrollLeft": "Scroll left",
+    "scrollRight": "Scroll right",
+    "resizeDrawer": "Resize drawer",
+    "closeCards": "Close cards",
+    "official": "Official release",
+    "dock": {
+      "prev": "Prev",
+      "prevAria": "Previous orbiter",
+      "next": "Next",
+      "nextAria": "Next orbiter",
+      "layout": "Layout",
+      "layoutAria": "Choose how many orbiters",
+      "cards": "Cards",
+      "hideCards": "Hide cards",
+      "showCards": "Show cards",
+      "monitorLoaded": "Orbiter {{letter}}: {{title}}",
+      "monitorLoadedFallback": "loaded track",
+      "monitorEmpty": "Orbiter {{letter}} (empty)",
+      "orbiterCountOne": "1 orbiter",
+      "orbiterCountMany": "{{count}} orbiters",
+      "leaveCollection": "Leave collection"
+    },
+    "stage": {
+      "emptyHint": "Drop a card here, or double-tap one to load",
+      "removeFromStage": "Remove orbiter from stage {{number}}"
+    },
+    "confirm": {
+      "leaveTitle": "Leave this collection?",
+      "leaveBody": "Your current arrangement will not be saved.",
+      "shrinkTitle": "Reduce the layout?",
+      "shrinkBodyOne": "This drops 1 loaded orbiter.",
+      "shrinkBodyMany": "This drops {{count}} loaded orbiters.",
+      "cancel": "Cancel",
+      "continue": "Continue"
+    }
+  },
+  "camera": {
+    "orbitMoon": "Orbit the moon",
+    "orbitWorld": "Orbit the world"
+  }
+}

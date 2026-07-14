@@ -1,0 +1,291 @@
+/* Shared modal layout */
+.modal {
+  --modal-surface: rgba(248, 249, 250, 0.98);
+  --modal-border: rgba(15, 23, 42, 0.12);
+  --modal-shadow: 0 1.25rem 3rem rgba(0, 0, 0, 0.24);
+  --modal-radius: var(--orbiters-rounded-corners, 5px);
+  position: fixed;
+  inset: 0;
+  display: none;
+  place-items: center;
+  padding: 0;
+  z-index: 1055;
+}
+
+.modal.show,
+.modal.active {
+  display: grid;
+}
+
+.modal-backdrop {
+  opacity: 0.5;
+}
+
+.modal-dialog {
+  width: 100%;
+  max-width: 22rem;
+  min-width: 0;
+  max-height: calc(100vh - 2rem);
+  margin: 0;
+  justify-self: center;
+  align-self: center;
+  box-sizing: border-box;
+  padding-inline: 1rem;
+}
+
+.modal-dialog-centered {
+  min-height: 0;
+  display: block;
+}
+
+.modal-content {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-height: inherit;
+  overflow: hidden;
+  background: var(--modal-surface);
+  border: 1px solid var(--modal-border);
+  border-radius: var(--modal-radius);
+  box-shadow: var(--modal-shadow);
+}
+
+.modal-header {
+  padding: 0.9rem 1rem 0.4rem;
+}
+
+.modal-title {
+  font-size: 1rem;
+  letter-spacing: 0.03em;
+}
+
+.modal-body {
+  overflow-y: auto;
+}
+
+.modal-footer {
+  align-items: center;
+  padding: 0.5rem 1rem 1rem;
+}
+
+#numericKeyboardModal .modal-content {
+  background: rgba(255, 255, 255, 0.985);
+}
+
+#numericKeyboardModal .modal-body {
+  padding-top: 0.65rem;
+}
+
+#universalModal {
+  z-index: 1056;
+}
+
+#universalModal .modal-content {
+  justify-content: space-between;
+}
+
+#universalModal .modal-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0.9rem 1rem 1rem;
+  font-size: 1rem;
+  color: #495057;
+}
+
+.modal-content-wrapper {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  text-align: center;
+}
+
+.capture-preset-picker {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.capture-preset-picker__description {
+  margin: 0;
+  color: rgba(15, 23, 42, 0.72);
+  font-size: 0.92rem;
+  line-height: 1.4;
+}
+
+.capture-preset-picker__options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.capture-preset-picker__option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  width: 100%;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: var(--orbiters-rounded-corners, 5px);
+  background: rgba(255, 255, 255, 0.92);
+  color: #0f172a;
+  text-align: center;
+  transition: border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
+}
+
+/* Aspect-ratio glyph row — fixed height so cards align regardless of box orientation. */
+.capture-preset-picker__option-preview-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+}
+
+.capture-preset-picker__option-preview {
+  background: rgba(15, 23, 42, 0.04);
+  border: 1px solid rgba(15, 23, 42, 0.32);
+  border-radius: 2px;
+}
+
+.capture-preset-picker__option.is-active .capture-preset-picker__option-preview {
+  border-color: #b91c1c;
+  background: rgba(185, 28, 28, 0.1);
+}
+
+.capture-preset-picker__option:hover,
+.capture-preset-picker__option:focus-visible {
+  border-color: rgba(15, 23, 42, 0.35);
+  box-shadow: 0 0.6rem 1.4rem rgba(15, 23, 42, 0.12);
+  transform: translateY(-1px);
+}
+
+.capture-preset-picker__option.is-active {
+  border-color: rgba(185, 28, 28, 0.45);
+  box-shadow: 0 0.65rem 1.4rem rgba(185, 28, 28, 0.12);
+}
+
+.capture-preset-picker__option-title {
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.capture-preset-picker__option-meta {
+  font-size: 0.83rem;
+  color: rgba(15, 23, 42, 0.64);
+}
+
+/* Capture modal action footer: Cancel (left) + Record (right), both outline.
+   Scoped to .capture-preset-modal so it doesn't restyle other universalModal uses. */
+#universalModal.capture-preset-modal .modal-footer {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+/* Cancel — black & white outline (overrides the default dark-filled footer button).
+   flex:1 makes Cancel + Record split the full width 50/50, matching the cards above. */
+#universalModal.capture-preset-modal .modal-footer .btn {
+  flex: 1 1 0;
+  background: #fff;
+  color: #0f172a;
+  border: 1px solid #0f172a;
+  transition: background-color 120ms ease, color 120ms ease, box-shadow 120ms ease;
+}
+
+#universalModal.capture-preset-modal .modal-footer .btn:hover,
+#universalModal.capture-preset-modal .modal-footer .btn:focus-visible {
+  background: #0f172a;
+  color: #fff;
+}
+
+/* Record — red destructive outline, compact "Record" + new-window icon. */
+#universalModal.capture-preset-modal .modal-footer .capture-preset-picker__record {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  background: #fff;
+  color: #b91c1c;
+  border: 1px solid #b91c1c;
+  font-weight: 600;
+}
+
+.capture-preset-picker__record-icon {
+  display: inline-flex;
+  align-items: center;
+}
+
+.capture-preset-picker__record-icon svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+#universalModal.capture-preset-modal .modal-footer .capture-preset-picker__record:hover,
+#universalModal.capture-preset-modal .modal-footer .capture-preset-picker__record:focus-visible {
+  background: #b91c1c;
+  color: #fff;
+  box-shadow: 0 0.6rem 1.4rem rgba(185, 28, 28, 0.24);
+}
+
+#qrCodeCanvas {
+  display: block;
+  margin: 0 auto;
+  width: min(100%, 14rem);
+  height: auto;
+  box-shadow: 0 0.5rem 1.4rem rgba(0, 0, 0, 0.12);
+}
+
+#universalModal .modal-footer {
+  border-top: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+#universalModal .modal-footer .btn,
+#numericKeyboardModal .modal-footer .btn,
+#universalModal [data-ui-core-dismiss="modal"].btn,
+#universalModal [data-bs-dismiss="modal"].btn {
+  min-width: 6rem;
+  min-height: 2.25rem;
+  padding: 0.5rem 0.9rem;
+  border-radius: var(--orbiters-rounded-corners, 5px);
+  border: 1px solid transparent;
+  background: rgba(15, 23, 42, 0.92);
+  color: #fff;
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
+}
+
+#universalModal .modal-footer .btn-close,
+#numericKeyboardModal .modal-header .btn-close,
+#universalModal .modal-header .btn-close {
+  border-radius: var(--orbiters-rounded-corners, 5px);
+}
+
+@media (max-width: 768px) {
+  .modal-dialog {
+    padding-inline: max(1rem, env(safe-area-inset-left), env(safe-area-inset-right));
+  }
+
+  .modal-content {
+    border-radius: var(--modal-radius);
+  }
+
+  .modal-header {
+    padding-top: 0.8rem;
+  }
+
+  #universalModal .modal-body {
+    padding: 0.85rem 0.9rem 0.95rem;
+  }
+
+  .capture-preset-picker__options {
+    grid-template-columns: 1fr;
+  }
+}
