@@ -35,6 +35,7 @@ import {
     getEmbeddedAuthToken,
     resolveStorageAssetURL,
     resetStorageBaseCache,
+    resetPrunedVersionMemo,
 } from '../../../src/api/dataManager/loaders.js';
 
 // Build a minimal fake Response that fetchReleaseFromApi understands.
@@ -49,6 +50,7 @@ function fakeResponse({ ok = true, status = 200, json } = {}) {
 beforeEach(() => {
     vi.clearAllMocks();
     Constants.clearAllCaches();
+    resetPrunedVersionMemo();
     Constants.TRACK_ID = null;
     resetStorageBaseCache();
     // Reset window globals the storage-base resolver consults.
@@ -133,6 +135,83 @@ describe('fetchTrackRelease', () => {
 
         expect(result).toBe(cached);
         expect(fetchJsonFromApi).not.toHaveBeenCalled();
+    });
+
+    // A stored session names the version it was built against, but versions get pruned and
+    // deleted. The pin is a preference, not a requirement — losing it must not fail the load.
+    it('pinned version that no longer exists: falls back to the latest release', async () => {
+        const live = { success: true, trackId: 't1', release: { version: 5 } };
+        fetchJsonFromApi
+            .mockResolvedValueOnce(fakeResponse({ ok: false, status: 404, json: {} }))
+            .mockResolvedValueOnce(fakeResponse({ json: live }));
+
+        const result = await fetchTrackRelease('t1', { version: 3 });
+
+        expect(result).toBe(live);
+        expect(fetchJsonFromApi).toHaveBeenCalledTimes(2);
+        expect(fetchJsonFromApi.mock.calls[0][0]).toContain('version=3');
+        expect(fetchJsonFromApi.mock.calls[1][0]).not.toContain('version=');
+    });
+
+    it('pinned version fallback caches under live, never under the pruned version', async () => {
+        const live = { success: true, trackId: 't1', release: { version: 5 } };
+        fetchJsonFromApi
+            .mockResolvedValueOnce(fakeResponse({ ok: false, status: 404, json: {} }))
+            .mockResolvedValueOnce(fakeResponse({ json: live }));
+
+        await fetchTrackRelease('t1', { version: 3 });
+
+        // Caching the live payload under "3" would hand a later reader the wrong version.
+        expect(Constants.getTrackRelease('t1', { version: 3 })).toBeFalsy();
+        expect(Constants.getTrackRelease('t1')).toBe(live);
+    });
+
+    it('unversioned not-found is NOT retried — the track itself is gone', async () => {
+        fetchJsonFromApi.mockResolvedValue(fakeResponse({ ok: false, status: 404, json: {} }));
+
+        await expect(fetchTrackRelease('t1')).rejects.toThrow('track-not-found');
+        expect(fetchJsonFromApi).toHaveBeenCalledTimes(1);
+    });
+
+    it('version 0 is a real pin, not a blank — a 404 on it still falls back', async () => {
+        const live = { success: true, trackId: 't1' };
+        fetchJsonFromApi
+            .mockResolvedValueOnce(fakeResponse({ ok: false, status: 404, json: {} }))
+            .mockResolvedValueOnce(fakeResponse({ json: live }));
+
+        const result = await fetchTrackRelease('t1', { version: 0 });
+
+        expect(result).toBe(live);
+        expect(fetchJsonFromApi).toHaveBeenCalledTimes(2);
+    });
+
+    it('a pin already proven gone is not requested again on the next load', async () => {
+        const live = { success: true, trackId: 't1' };
+        fetchJsonFromApi
+            .mockResolvedValueOnce(fakeResponse({ ok: false, status: 404, json: {} }))
+            .mockResolvedValueOnce(fakeResponse({ json: live }));
+        await fetchTrackRelease('t1', { version: 3 });
+        expect(fetchJsonFromApi).toHaveBeenCalledTimes(2);
+
+        // Second load, cold cache, same dead pin: go straight to live — no repeat 404.
+        Constants.clearAllCaches();
+        fetchJsonFromApi.mockClear();
+        fetchJsonFromApi.mockResolvedValue(fakeResponse({ json: live }));
+
+        const again = await fetchTrackRelease('t1', { version: 3 });
+
+        expect(again).toBe(live);
+        expect(fetchJsonFromApi).toHaveBeenCalledTimes(1);
+        expect(fetchJsonFromApi.mock.calls[0][0]).not.toContain('version=');
+    });
+
+    it('a non-404 failure on a versioned request is not retried', async () => {
+        fetchJsonFromApi.mockResolvedValue(
+            fakeResponse({ ok: false, status: 500, json: { message: 'boom' } })
+        );
+
+        await expect(fetchTrackRelease('t1', { version: 3 })).rejects.toThrow('boom');
+        expect(fetchJsonFromApi).toHaveBeenCalledTimes(1);
     });
 });
 

@@ -269,13 +269,22 @@ webaudio-param {
 /* Responsive Frame: Centered and flexible size */
 .ratio-frame {
     position: absolute;
-    top: 50%;
+    /* `--orb-studio-sheet-reserve` is the height of the edit mode bottom sheet while it is open (set
+       by StudioShell, unset = 0 everywhere else). The canvas frame gives that room back to the sheet
+       and rides UP by half of it, so it stays centred in what remains instead of hiding behind the
+       sheet — you edit and watch the orbiter at the same time. WorldSceneController re-fits the
+       renderer and camera to the new box. */
+    top: calc(50% - var(--orb-studio-sheet-reserve, 0px) / 2);
     left: 50%;
     transform: translate(-50%, -50%);
     width: 100%; /* Take full width of the window */
-    height: 100%; /* Take full height of the window */
+    height: calc(100% - var(--orb-studio-sheet-reserve, 0px));
     min-width: var(--orbiters-min-size);
-    min-height: var(--orbiters-min-size);
+    /* The floor must never exceed what is actually free, or a short viewport (a phone in landscape,
+       a small window) would clamp the frame taller than the room above the sheet and push its bottom
+       back underneath it — hiding the lower scene and framing the camera for a region that isn't
+       visible. With no sheet open this is just `--orbiters-min-size`, as before. */
+    min-height: min(var(--orbiters-min-size), calc(100% - var(--orb-studio-sheet-reserve, 0px)));
     max-width: 100%; /* Restrict to window width */
     max-height: 100%; /* Restrict to window height */
     background-color: #000; /* Optional for debugging */

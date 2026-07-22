@@ -190,6 +190,10 @@ export interface MultiStageStudioProps {
   /** "Load full sessions" (the drawer toolbar): when engaged, a drop replaces the deck with the
    *  card's ORIGINAL session instead of swapping only the card's own dimension. */
   loadDefaults?: { enabled: boolean; onToggle: () => void } | null;
+  /** True when no entry in the collection can start a stage — only a track can, and this one has
+   *  none. The studio says so up front (see the notice dialog) instead of leaving the user with
+   *  stages that silently refuse every card. */
+  noPlayableEntries?: boolean;
   // Arrange UX. These are supplied to EVERYONE who can view (viewing grants full session-local
   // interaction); only Save (persist) is edit-gated.
   /** The collection's entries, listed in the drawer as draggable cards. */
@@ -260,6 +264,7 @@ export function MultiStageStudio({
   onBack,
   cruise = null,
   loadDefaults = null,
+  noPlayableEntries = false,
   entries,
   stageVoiceIds,
   stageEntries,
@@ -286,6 +291,10 @@ export function MultiStageStudio({
   const [resizing, setResizing] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(true);
   const [pendingConfirmation, setPendingConfirmation] = useState<PendingConfirmation>(null);
+  // The "nothing here can play" notice is shown once, on arrival, and stays dismissed for the
+  // session — the collection's contents can't be changed from inside the Studio, so repeating it
+  // would only be in the way.
+  const [noticeDismissed, setNoticeDismissed] = useState(false);
 
   const gridRef = useRef<HTMLDivElement | null>(null);
   // The mobile vertical stage stack's scroll container (this component's own root). The pager scrolls IT
@@ -1181,6 +1190,10 @@ export function MultiStageStudio({
                       cornerColors={isDropTarget ? 'var(--color-foreground, #ffffff)' : 'color-mix(in oklab, var(--color-foreground, #ffffff) 35%, transparent)'}
                       cornerWidth={24}
                       cornerHeight={22}
+                      // The frame marks the drop target, and the wrapper is pointer-events:none, so
+                      // the card's default hover reveal would never fire — and a drag-over is not a
+                      // hover in any case. These corners stay on.
+                      alwaysShowCorners
                       // The frame spans the WHOLE placeholder (its corners sit at the stage edges, inset
                       // only by the wrapper padding) so the entire stage reads as the drop target — not a
                       // small box floating in the middle.
@@ -1536,6 +1549,27 @@ export function MultiStageStudio({
           <StationTrackCard entry={dragEntry} compact showBadge />
         </div>
       )}
+
+      {/* Nothing in this collection can start a stage (design-lib AlertDialog, single action) — said on
+          arrival, because every empty stage will otherwise just refuse each card without explaining. */}
+      <AlertDialog
+        open={noPlayableEntries && !noticeDismissed}
+        onOpenChange={(next) => {
+          if (!next) setNoticeDismissed(true);
+        }}
+      >
+        <AlertDialogContent className="dark orb-studio__portal-surface">
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('studio.notPlayable.title')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('studio.notPlayable.body')}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setNoticeDismissed(true)}>
+              {t('studio.notPlayable.dismiss')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Confirmation dialog (design-lib AlertDialog) — a count-shrink that would drop loaded orbiters, or
           leaving the collection. */}

@@ -268,6 +268,13 @@ body:has(.orbiters-edit-panel) .orbiters-react-ui {
   display: flex;
   z-index: var(--orbiters-react-ui-z);
   pointer-events: none;
+  /* Mobile sheet reserve. The sheet is portalled to <body>, so it is in no layout flow and can push
+     nothing by itself; StudioShell publishes the room it occupies (sheet height + the bar it is
+     docked above) here instead. Reserving it shrinks `.orb-studio__stage` below, so the play overlay
+     reflows into the room ABOVE the sheet rather than being buried by it — the mobile counterpart of
+     the desktop rail, which the flex row reserves for free. `.ratio-frame` (src/css/style.css)
+     reserves the SAME var so the orbiter canvas follows. Unset (0) when closed and on desktop. */
+  padding-bottom: var(--orb-studio-sheet-reserve, 0px);
 }
 /* The orbiter's placeholder. `position: relative` so the play overlay (absolute, inset:0) fills
    exactly this region — the orbiter + its live play UI, untouched. */
@@ -324,8 +331,11 @@ body:has(.orbiters-edit-panel) .orbiters-react-ui {
    so it applies ONLY in the studio mobile branch (the bar isn't rendered on desktop or in play mode) —
    the bar is PORTALLED to <body>, so it is no longer a child of `.orb-studio` and a `:has(> .bar)` gate
    would never match. Tracks the lib bar-height var + the device safe-area so it stays exact. The grid is
-   `box-sizing:border-box`, so this shrinks its content box and lifts the row. */
-.orb-studio[data-mobile-bar] .orbiters-react-ui {
+   `box-sizing:border-box`, so this shrinks its content box and lifts the row.
+   NOT while the sheet is up (`:not([data-sheet-open])`): the sheet reserve on `.orb-studio` already
+   counts the bar, and the stage now ends at the sheet's top edge, so the bar is nowhere near the play
+   grid. Keeping this then reserved the bar TWICE and floated the readouts a bar's height too high. */
+.orb-studio[data-mobile-bar]:not([data-sheet-open]) .orbiters-react-ui {
   padding-bottom: calc(
     var(--orb-margin) + var(--nav-mobile-bar-height, 4rem) + env(safe-area-inset-bottom, 0px)
   );

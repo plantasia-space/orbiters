@@ -316,6 +316,39 @@ export async function fetchReleaseFromApi(path, entityLabel, options = {}) {
 // ============================================================================
 
 /**
+ * Which cache keys a primed payload may legitimately answer.
+ *
+ * The unversioned (`version: null`) key means "whatever is live". Seeding a payload there
+ * unconditionally is how a PINNED release ends up served to a voice that asked for the live one —
+ * the two are different bytes under the same key. A payload may claim the live key only when the
+ * entity's own pointer agrees that it is live.
+ *
+ * @param {object} payload a release response.
+ * @returns {{version: number|null, isLive: boolean}}
+ */
+function resolvePrimedReleaseKeys(payload) {
+    const version = payload?.release?.version ?? null;
+    if (version == null) return { version: null, isLive: true };
+
+    // Claiming the live key needs POSITIVE evidence that this payload IS live. Treating a missing
+    // pointer as proof of liveness let a pinned item — which carries no pointer of its own — be
+    // written under the live key and answer every later unpinned request with the wrong bytes.
+    const current = payload?.currentReleaseVersion ?? null;
+    if (current != null) return { version, isLive: version === current };
+    if (typeof payload?.isLatest === 'boolean') return { version, isLive: payload.isLatest };
+
+    // No pointer, but the payload's own release list still says which version is newest.
+    const versions = (Array.isArray(payload?.releases) ? payload.releases : [])
+        .map((release) => release?.version)
+        .filter((value) => typeof value === 'number');
+    if (versions.length > 0) return { version, isLive: version === Math.max(...versions) };
+
+    // Nothing to check against: seed the exact version only. The voice re-fetches for a live
+    // request, which costs a round trip — far cheaper than serving it a pinned release.
+    return { version, isLive: false };
+}
+
+/**
  * Seed the global track-release cache with a payload we ALREADY have — the
  * `hydrationLevel=2` collection fetch returns, per item, the same hydrated release response the
  * per-voice `/tracks/{id}/release?hydrate=2` call would fetch again (the same backend builders).
@@ -335,7 +368,9 @@ export function primeTrackReleaseCache(trackId, payload) {
     // Seed only what fetchTrackRelease will actually honor for a hydrated request — otherwise the
     // seed is dead weight that reports success while every voice still re-fetches.
     if (!hasHydratedReleases(payload)) return false;
-    Constants.setTrackRelease(id, payload, { version: null });
+    const { version, isLive } = resolvePrimedReleaseKeys(payload);
+    if (version != null) Constants.setTrackRelease(id, payload, { version });
+    if (isLive) Constants.setTrackRelease(id, payload, { version: null });
     return true;
 }
 
@@ -343,7 +378,9 @@ export function primeTrackReleaseCache(trackId, payload) {
 export function primeOrbiterReleaseCache(orbiterId, payload) {
     const id = typeof orbiterId === 'string' ? orbiterId : null;
     if (!id || !payload || typeof payload !== 'object' || !payload.release) return false;
-    Constants.setOrbiterRelease(id, payload, { version: null });
+    const { version, isLive } = resolvePrimedReleaseKeys(payload);
+    if (version != null) Constants.setOrbiterRelease(id, payload, { version });
+    if (isLive) Constants.setOrbiterRelease(id, payload, { version: null });
     return true;
 }
 
@@ -351,8 +388,62 @@ export function primeOrbiterReleaseCache(orbiterId, payload) {
 export function primeWorldReleaseCache(worldId, payload) {
     const id = typeof worldId === 'string' ? worldId : null;
     if (!id || !payload || typeof payload !== 'object' || !payload.release) return false;
-    Constants.setWorldRelease(id, payload, { version: null });
+    const { version, isLive } = resolvePrimedReleaseKeys(payload);
+    if (version != null) Constants.setWorldRelease(id, payload, { version });
+    if (isLive) Constants.setWorldRelease(id, payload, { version: null });
     return true;
+}
+
+/** Pinned requests already proven gone. Without this every later load repeats the dead
+ *  request before the retry, doubling release traffic for the whole session. Keyed by the
+ *  request path, so a different entity or version is unaffected. */
+const prunedVersions = new Set();
+
+function prunedKey(entityLabel, path) {
+    return `${entityLabel}::${path}`;
+}
+
+/** Test seam: drop the memo of pinned versions proven missing. */
+export function resetPrunedVersionMemo() {
+    prunedVersions.clear();
+}
+
+/**
+ * Fetches a release, tolerating a pinned version that no longer exists.
+ *
+ * A stored session names the version it was built against, but versions are not permanent:
+ * retention prunes them and an author can delete one. The pin is a preference, not a
+ * requirement — the latest release is always the default — so a version that 404s falls back
+ * to live once rather than failing the whole load.
+ *
+ * Only a not-found on a *versioned* request is retried. An unversioned 404 means the entity
+ * itself is gone, and every other error propagates untouched.
+ *
+ * @param {(version: string|number|null) => string} buildPath Builds the request path for a version.
+ * @param {string} entityLabel Entity label used for error text, e.g. `'track'`.
+ * @param {string|number|null} version The requested version, or null for live.
+ * @returns {Promise<{payload: object|null, version: string|number|null}>} Payload and the version
+ *   it actually came from — null when the pinned version was abandoned for live.
+ */
+async function fetchReleaseAllowingPrunedVersion(buildPath, entityLabel, version) {
+    // `== null` on purpose: only absent means "live". Version 0 is a value, not a blank.
+    const isPinned = version != null && version !== '';
+    if (isPinned && prunedVersions.has(prunedKey(entityLabel, buildPath(version)))) {
+        return { payload: await fetchReleaseFromApi(buildPath(null), entityLabel), version: null };
+    }
+    try {
+        return { payload: await fetchReleaseFromApi(buildPath(version), entityLabel), version };
+    } catch (error) {
+        const notFound = String(error?.message || '') === `${entityLabel.toLowerCase()}-not-found`;
+        if (!isPinned || !notFound) {
+            throw error;
+        }
+        prunedVersions.add(prunedKey(entityLabel, buildPath(version)));
+        console.warn(
+            `[DataManager] ${entityLabel} version ${version} no longer exists — loading the latest release instead.`
+        );
+        return { payload: await fetchReleaseFromApi(buildPath(null), entityLabel), version: null };
+    }
 }
 
 export async function fetchTrackRelease(
@@ -370,16 +461,18 @@ export async function fetchTrackRelease(
         return cached;
     }
 
-    const payload = await fetchReleaseFromApi(
-        buildTrackReleasePath(trackId, { version, hydrate: resolvedHydrate }),
-        'track'
+    const { payload, version: resolvedVersion } = await fetchReleaseAllowingPrunedVersion(
+        (v) => buildTrackReleasePath(trackId, { version: v, hydrate: resolvedHydrate }),
+        'track',
+        version
     );
-    
+
     if (!payload) {
         return null;
     }
 
-    return cache.setTrackRelease(trackId, payload, { version });
+    // Cache under the version actually served, never the pruned one that was asked for.
+    return cache.setTrackRelease(trackId, payload, { version: resolvedVersion });
 }
 
 export async function fetchOrbiterRelease(orbiterId, { version = null, useFallback = true, cache = Constants } = {}) {
@@ -393,16 +486,17 @@ export async function fetchOrbiterRelease(orbiterId, { version = null, useFallba
     }
 
     try {
-        const payload = await fetchReleaseFromApi(
-            `/orbiters/${orbiterId}/release${buildVersionQuery(version)}`,
-            'orbiter'
+        const { payload, version: resolvedVersion } = await fetchReleaseAllowingPrunedVersion(
+            (v) => `/orbiters/${orbiterId}/release${buildVersionQuery(v)}`,
+            'orbiter',
+            version
         );
-        
+
         if (!payload) {
             return null;
         }
 
-        return cache.setOrbiterRelease(orbiterId, payload, { version });
+        return cache.setOrbiterRelease(orbiterId, payload, { version: resolvedVersion });
     } catch (error) {
         if (!useFallback) {
             throw error;
@@ -430,14 +524,15 @@ export async function fetchEntangledWorldRelease(worldId, { version = null, cach
         return cached;
     }
 
-    const payload = await fetchReleaseFromApi(
-        `/entangled-worlds/${worldId}/release${buildVersionQuery(version)}`,
-        'entangled world'
+    const { payload, version: resolvedVersion } = await fetchReleaseAllowingPrunedVersion(
+        (v) => `/entangled-worlds/${worldId}/release${buildVersionQuery(v)}`,
+        'entangled world',
+        version
     );
 
     if (!payload) {
         return null;
     }
 
-    return cache.setWorldRelease(worldId, payload, { version });
+    return cache.setWorldRelease(worldId, payload, { version: resolvedVersion });
 }

@@ -192,10 +192,52 @@ function normalizeUrlDescriptor(params) {
   return descriptor.trackId || descriptor.orbiterId || descriptor.entangledWorldId ? descriptor : null;
 }
 
+/**
+ * The id a release payload has for ITSELF, read from the shallow, canonical places only.
+ *
+ * Deliberately not recursive: everything below the top level of a release describes other
+ * entities (linked ids, embedded releases, the author's reference session), and none of that
+ * identifies this payload.
+ *
+ * @param {object} payload A release payload (`trackSession` / `orbiterSession` / `entangledWorldSession`).
+ * @param {'trackId'|'orbiterId'|'entangledWorldId'} field Which id this blob is expected to carry.
+ * @returns {string|null}
+ */
+function ownReleaseId(payload, field) {
+  if (!payload || typeof payload !== 'object' || !field) return null;
+  const names =
+    field === 'entangledWorldId' ? ['worldId', 'entangledWorldId'] : [field];
+
+  // The wrappers a blob may legitimately arrive inside. These re-describe the SAME entity, so
+  // reading through them is safe — unlike `hydration`, `entitiesPreview` or an embedded
+  // release, which describe other entities and are exactly what must not be followed.
+  const selves = [
+    payload,
+    payload.release?.metadata,
+    payload.metadata,
+    payload.track,
+    payload.orbiter,
+    payload.entangledWorld,
+    payload.world,
+    payload.data,
+    payload.session,
+  ];
+
+  for (const self of selves) {
+    if (!self || typeof self !== 'object') continue;
+    for (const name of names) {
+      const found = sanitizeId(self[name]);
+      if (found) return found;
+    }
+  }
+
+  const metadata = payload.release?.metadata ?? payload.metadata ?? null;
+  return sanitizeId(metadata?.permissions?.entityId) ?? sanitizeId(metadata?.id);
+}
+
 function normalizeHydratedDescriptor(hydrated) {
   if (!hydrated || typeof hydrated !== 'object') return null;
   const descriptor = { trackId: null, orbiterId: null, entangledWorldId: null };
-  const visited = new Set();
   let changed = false;
   const blobs = {
     trackSession: hydrated.trackSession ?? null,
@@ -204,9 +246,17 @@ function normalizeHydratedDescriptor(hydrated) {
   };
 
   ['trackSession', 'orbiterSession', 'entangledWorldSession'].forEach((key) => {
-    if (hydrated[key]) {
-      changed =
-        collectIdsFromObject(hydrated[key], descriptor, visited, 0, SCOPED_KEYS[key]) || changed;
+    if (!hydrated[key]) return;
+    // Take the blob's OWN id, never a deep scan of it.
+    //
+    // These are full release payloads, and a release embeds other releases: a track release
+    // carries its orbiter's release, whose metadata holds `entitiesPreview` — the linked ids
+    // the author built that orbiter against. Those are an editing reference, not a playback
+    // input. A recursive id hunt reached them and adopted the author's reference track as the
+    // session's track, so choosing a different audio resolved back to the old one.
+    const own = ownReleaseId(hydrated[key], SCOPED_KEYS[key]);
+    if (own) {
+      changed = assignId(descriptor, SCOPED_KEYS[key], own) || changed;
     }
   });
 

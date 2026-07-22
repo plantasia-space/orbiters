@@ -362,3 +362,107 @@ describe('DataManager.applyConfigOverrides edit-mode fallback', () => {
         expect(configUpdatedEvents).toHaveLength(0);
     });
 });
+
+// ===========================================================================
+// Per-voice release pin (sessionDescriptor.trackVersion)
+// ===========================================================================
+// Regression cover for a version that reached the voice but never reached the fetch.
+// In the shared multi-orbiter realm every voice reads the SAME page URL, so a per-card
+// version pin cannot travel as a URL param — it rides the voice's sessionDescriptor.
+// The descriptor used to stop at the voice session: the DataManager never received it and
+// resolved the request from the URL alone, so a pinned voice silently loaded the LIVE
+// release. Metadata looked right (the host fetched the pinned release itself) while the
+// audio was the current version — the bug these tests lock out.
+describe('DataManager — per-voice trackVersion pin', () => {
+    it('sends the descriptor pin to assembleConfig when the URL carries no version', async () => {
+        assembleConfig.mockResolvedValue(makeCombined());
+
+        const dm = new DataManager({ sessionDescriptor: { trackId: 'track-1', trackVersion: 3 } });
+        await dm.fetchAndUpdateConfig('track-1');
+
+        expect(assembleConfig).toHaveBeenCalledWith(
+            expect.objectContaining({ trackId: 'track-1', trackVersion: 3 })
+        );
+    });
+
+    it('keys the cache per version so two versions of one track cannot collide', async () => {
+        assembleConfig.mockResolvedValue(makeCombined());
+
+        const pinned = new DataManager({ sessionDescriptor: { trackId: 'track-1', trackVersion: 3 } });
+        await pinned.fetchAndUpdateConfig('track-1');
+
+        // A different key than the unpinned/live one — otherwise the first voice to load
+        // would hand its snapshot to every other voice on the same track.
+        expect(pinned.currentConfigKey).not.toBe(Constants.buildConfigKey({ trackId: 'track-1' }));
+        expect(pinned.currentConfigKey).toBe(
+            Constants.buildConfigKey({ trackId: 'track-1', version: 3 })
+        );
+    });
+
+    it('leaves an unpinned voice on the live release', async () => {
+        assembleConfig.mockResolvedValue(makeCombined());
+
+        const dm = new DataManager({ sessionDescriptor: { trackId: 'track-1' } });
+        await dm.fetchAndUpdateConfig('track-1');
+
+        expect(assembleConfig).toHaveBeenCalledWith(
+            expect.objectContaining({ trackId: 'track-1', trackVersion: null })
+        );
+    });
+
+    it('lets the descriptor pin win over a page URL version (the realm shares one URL)', async () => {
+        window.history.replaceState({}, '', '/?trackVersion=9');
+        assembleConfig.mockResolvedValue(makeCombined());
+
+        const dm = new DataManager({ sessionDescriptor: { trackId: 'track-1', trackVersion: 3 } });
+        await dm.fetchAndUpdateConfig('track-1');
+
+        expect(assembleConfig).toHaveBeenCalledWith(
+            expect.objectContaining({ trackVersion: 3 })
+        );
+    });
+
+    it('still honours the URL version for the standalone app (no descriptor)', async () => {
+        window.history.replaceState({}, '', '/?trackVersion=9');
+        assembleConfig.mockResolvedValue(makeCombined());
+
+        const dm = new DataManager();
+        await dm.fetchAndUpdateConfig('track-1');
+
+        expect(assembleConfig).toHaveBeenCalledWith(
+            expect.objectContaining({ trackVersion: '9' })
+        );
+    });
+});
+
+// A voice that explicitly unpins must not inherit the page's ?trackVersion=. The realm's URL
+// belongs to every voice, so falling through to it would re-pin a card that just went back to
+// the live release.
+describe('DataManager — explicit unpin beats the shared page URL', () => {
+    it('treats a descriptor trackVersion of null as "live release", not "ask the URL"', async () => {
+        window.history.replaceState({}, '', '/?trackVersion=9');
+        assembleConfig.mockResolvedValue(makeCombined());
+
+        const dm = new DataManager({ sessionDescriptor: { trackId: 'track-1', trackVersion: null } });
+        await dm.fetchAndUpdateConfig('track-1');
+
+        expect(assembleConfig).toHaveBeenCalledWith(
+            expect.objectContaining({ trackVersion: null })
+        );
+    });
+
+    it('treats an undefined trackVersion on a voice descriptor the same way', async () => {
+        window.history.replaceState({}, '', '/?trackVersion=9');
+        assembleConfig.mockResolvedValue(makeCombined());
+
+        // makeOrbiterVoiceSession always sets the key, undefined when the host did not pin.
+        const dm = new DataManager({
+            sessionDescriptor: { trackId: 'track-1', trackVersion: undefined },
+        });
+        await dm.fetchAndUpdateConfig('track-1');
+
+        expect(assembleConfig).toHaveBeenCalledWith(
+            expect.objectContaining({ trackVersion: null })
+        );
+    });
+});

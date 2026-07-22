@@ -16,9 +16,12 @@
  *    and the sheet slides down BEHIND it; in place it would be trapped inside this shell's own fixed,
  *    z-indexed stacking context and the sheet would animate over it.
  *
- * The shell owns the Panel/Engine `mode` (shared by the desktop toggle + the mobile bar) and the canvas
- * reframe: `WorldSceneController.setViewportInset` re-fits renderer size + camera aspect together (no
- * deformation); mobile clears the inset (orbiter full-bleed under the drawer).
+ * The shell owns the Panel/Engine `mode` (shared by the desktop toggle + the mobile bar) and the orbiter
+ * reflow, so on BOTH surfaces you can edit and watch the orbiter at once:
+ *  • Desktop — `WorldSceneController.setViewportInset` reserves the rail width, re-fitting renderer size
+ *    and camera aspect together (no deformation).
+ *  • Mobile — the open sheet's measured height is published as a root CSS var (see the reserve effect),
+ *    which shrinks the shell stage and the canvas frame; the scene controller re-fits to the new box.
  */
 import { useCallback, useEffect, useRef, useState, type MutableRefObject, type ReactNode } from 'react';
 import {
@@ -42,8 +45,22 @@ const PANEL_WIDTH = `${PANEL_WIDTH_REM}rem`;
 
 // The mobile sheet is the disclosure the bottom-bar buttons operate: they carry `aria-controls` +
 // `aria-expanded` pointing here, so a screen reader can tell that a mode button opens/closes it.
-// One studio shell is mounted at a time, so a constant id is unambiguous.
+// One studio shell is mounted at a time, so a constant id is unambiguous. It doubles as the
+// measurement handle for the reserve effect below (the sheet portals to <body>, so we query it).
 const SHEET_ID = 'orb-studio-sheet';
+
+// The share of the viewport the mobile sheet takes when open. FIXED, not a cap: the second mode's
+// body is mounted lazily (see `bothModesMounted`), so a content-sized sheet would open at the short
+// mode's height and then GROW when the tall one arrives — re-fitting the scene under the finger a
+// beat after the tap. One height in every mode and at every moment; the orbiter keeps the rest.
+// `dvh` so the mobile browser's collapsing chrome doesn't move it.
+const SHEET_DVH = 40;
+
+// The CSS var carrying the room the open sheet occupies — its own height PLUS the bottom bar it is
+// docked above, i.e. everything between the orbiter and the foot of the screen. `.orb-studio`
+// reserves it as padding (the play UI reflows above the sheet) and `.ratio-frame` shrinks by it (the
+// orbiter canvas re-fits). Unset = 0 when the sheet is closed and on desktop.
+const SHEET_RESERVE_VAR = '--orb-studio-sheet-reserve';
 
 export interface StudioShellProps {
   children: ReactNode;
@@ -65,7 +82,11 @@ function useModeLabels(): Record<PanelMode, string> {
 export function StudioShell({ children, renderPanel }: StudioShellProps) {
   const isMobile = useIsMobileNav();
   const [mode, setMode] = useState<PanelMode>('engine');
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  // Edit mode opens with the sheet already up, on Engine. Arriving to a bare orbiter left the edit
+  // controls behind an unlabelled tap — showing the panel is what tells you the bar is there and
+  // which button opened it. Closing is still one tap on the lit mode. Desktop ignores this: that
+  // branch renders the rail, not the drawer.
+  const [drawerOpen, setDrawerOpen] = useState(true);
   const labels = useModeLabels();
 
   // CHROME theme: the shell panel follows the USER's chosen preset from `/me/users/settings`
@@ -158,12 +179,64 @@ export function StudioShell({ children, renderPanel }: StudioShellProps) {
     return () => setInset(0);
   }, [isMobile]);
 
+  // Mobile reflow: the sheet is PORTALLED to <body>, so it sits in no layout flow and can push
+  // nothing by itself — left alone it simply buries the orbiter. Publish its measured height as a
+  // root CSS var instead; the stylesheet does the rest (shell padding reflows the play UI, the
+  // canvas frame shrinks and the scene controller re-fits renderer + camera to the new box). Same
+  // idea as the desktop rail, which the flex row reserves for free.
+  // `offsetHeight` is the LAYOUT height, unaffected by the open/close slide transform, so the
+  // measurement doesn't chase the animation; a ResizeObserver re-measures if the content changes
+  // it (e.g. the second mode mounting, or the sheet laying out after it is appended). Cleared on
+  // close, on desktop, and on unmount.
+  useEffect(() => {
+    const root = document.documentElement;
+    const clear = () => root.style.removeProperty(SHEET_RESERVE_VAR);
+    if (!isMobile || !drawerOpen) { clear(); return undefined; }
+    let ro: ResizeObserver | null = null;
+    let mo: MutationObserver | null = null;
+    let measure: (() => void) | null = null;
+    const onResize = () => measure?.();
+    const start = () => {
+      const sheetEl = document.getElementById(SHEET_ID);
+      if (!sheetEl) return false;
+      // The sheet is docked ABOVE the bar (`aboveBar` = `bottom: var(--nav-mobile-bar-height)`), so
+      // the room it occupies is its own height PLUS the bar underneath it. Counting only the sheet
+      // left a bar's worth of orbiter hidden behind it.
+      const barEl = document.querySelector<HTMLElement>('[data-slot="bottom-nav-bar-surface"]');
+      measure = () => {
+        const px = sheetEl.offsetHeight + (barEl?.offsetHeight ?? 0);
+        root.style.setProperty(SHEET_RESERVE_VAR, `${Math.round(px)}px`);
+      };
+      measure();
+      ro = new ResizeObserver(measure);
+      ro.observe(sheetEl);
+      if (barEl) ro.observe(barEl);
+      return true;
+    };
+    // The drawer appends its portal to <body> a tick AFTER this effect runs, so the first look
+    // usually misses — watch for the node instead of polling frames for it. `childList` on <body>
+    // alone (no subtree) is exactly where the portal lands, and the watch ends the moment it does.
+    if (!start()) {
+      mo = new MutationObserver(() => { if (start()) { mo?.disconnect(); mo = null; } });
+      mo.observe(document.body, { childList: true });
+    }
+    window.addEventListener('resize', onResize);
+    return () => {
+      mo?.disconnect();
+      ro?.disconnect();
+      window.removeEventListener('resize', onResize);
+      clear();
+    };
+  }, [isMobile, drawerOpen]);
+
   if (isMobile) {
     return (
       // `data-mobile-bar` marks the branch that renders the bottom bar. The bar itself is PORTALLED to
       // <body> (below), so it is no longer a child of this element — the play grid's bottom clearance
       // keys off this attribute instead of the bar's DOM position.
-      <div className="orb-studio" data-mobile-bar="on">
+      // `data-sheet-open` lets the stylesheet drop the play grid's bar clearance while the sheet is
+      // up: the reserve above already accounts for the bar, and the bar no longer overlaps the stage.
+      <div className="orb-studio" data-mobile-bar="on" data-sheet-open={drawerOpen ? 'on' : undefined}>
         <div className="orb-studio__stage">{children}</div>
         {/* Library Drawer = real bottom sheet. Non-modal (`modal={false}` + `overlay={false}`) so the
             orbiter + bottom bar behind it stay interactive, and `aboveBar` docks it above the bar so the
@@ -173,20 +246,17 @@ export function StudioShell({ children, renderPanel }: StudioShellProps) {
             slides the content horizontally, and the sheet keeps the height of the tallest panel instead of
             resizing under the finger on every switch. */}
         <Drawer open={drawerOpen} onOpenChange={setDrawerOpen} modal={false}>
-          {/* FIXED height, not fit-to-content and not a max: left to itself the sheet sizes to its TALLEST
-              mode (the design one), which buries the orbiter — the canvas is not reframed on mobile, so
-              whatever the sheet covers is simply hidden. A mere cap wouldn't do either: the sheet would fit
-              the short mode on open and then GROW when the tall body mounts. A fixed height is the same
-              surface in every mode and at every moment — the short mode (engine) renders complete inside
-              it, the tall one scrolls, and the rest of the screen stays orbiter. `dvh` so the mobile
-              browser's collapsing chrome doesn't move it under the finger. */}
+          {/* SHEET_DVH of the screen, and the orbiter reflows into the rest (the reserve effect
+              measures this height plus the bar; the stage and the canvas frame shrink by it). Fixed
+              rather than content-sized — see SHEET_DVH for why the lazily-mounted second mode makes a
+              cap the wrong shape here. The short mode renders complete inside it, the tall one scrolls. */}
           <DrawerContent
             ref={applyChrome}
             className="dark"
             aboveBar
             overlay={false}
             id={SHEET_ID}
-            style={{ height: '60dvh' }}
+            style={{ height: `${SHEET_DVH}dvh` }}
           >
             <DrawerTitle className="px-4 pt-1 text-sm font-semibold">{labels[mode]}</DrawerTitle>
             <DrawerDescription className="sr-only">Orbiter {labels[mode]} settings</DrawerDescription>

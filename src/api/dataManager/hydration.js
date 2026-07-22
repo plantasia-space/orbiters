@@ -44,12 +44,22 @@ export async function loadFromHydratedSession({
     const hydratedTrack = trackSession ? normalizeTrackRelease(trackSession) : null;
     if (hydratedTrack?.trackId) {
         mergedDescriptor.trackId = mergedDescriptor.trackId || hydratedTrack.trackId;
-        mergedDescriptor.trackVersion = mergedDescriptor.trackVersion || hydratedTrack.version || null;
-        cache.setTrackRelease(
-            hydratedTrack.trackId,
-            trackSession,
-            { version: hydratedTrack.version ?? trackSession?.release?.version ?? null }
-        );
+        // The blob's version is deliberately NOT copied onto the descriptor.
+        //
+        // A hydrated payload is a cached copy handed over by the host, and the host persists
+        // it on the entity it belongs to. Its version therefore ages: retention prunes
+        // releases, so a blob saved months ago names a version that no longer exists, and
+        // inheriting it turned every later load into a request for a dead pin. An unpinned
+        // request means live, which is the standing rule anyway — latest is always the
+        // default. Only a caller that explicitly asked for a version gets one.
+        const hydratedVersion = hydratedTrack.version ?? trackSession?.release?.version ?? null;
+        cache.setTrackRelease(hydratedTrack.trackId, trackSession, { version: hydratedVersion });
+        // Also prime the live key. The host fetches this blob unversioned, so it IS the live
+        // release; without this the unpinned lookup below would miss and re-fetch what we were
+        // just handed, throwing away the whole point of hydrating.
+        if (hydratedVersion != null) {
+            cache.setTrackRelease(hydratedTrack.trackId, trackSession, { version: null });
+        }
     }
 
     // Hydrate and cache orbiter

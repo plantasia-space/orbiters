@@ -105,6 +105,9 @@ export function CaptureDialog() {
                   cornerColors={active ? 'var(--success)' : 'var(--color-border)'}
                   className="orbiters-capture-dialog__option-card"
                   contentClassName="orbiters-capture-dialog__option-content"
+                  // The corner colour is the "this format is selected" signal, so it has to be
+                  // readable at rest rather than only while the pointer is over the option.
+                  alwaysShowCorners
                 >
                   <span className="orbiters-capture-dialog__option-preview-row" aria-hidden="true">
                     <span

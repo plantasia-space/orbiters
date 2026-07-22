@@ -149,6 +149,7 @@ function makeStubNotify() {
         notifyOrbiterFallback: vi.fn(),
         clearOrbiterFallback: vi.fn(),
         notifyWorldUnavailable: vi.fn(),
+        notifyTrackUnavailable: vi.fn(),
         reset: vi.fn(),
     };
 }

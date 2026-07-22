@@ -23,22 +23,22 @@ import { voiceRegistry } from '../voice/VoiceRegistry.js';
 import { MIDIControllerInstance } from '../input/midi/MIDIController.js';
 import { saveCollectionLayout } from '../api/collectionDataService.js';
 import { primeTrackReleaseCache, primeOrbiterReleaseCache, primeWorldReleaseCache, fetchTrackRelease, fetchOrbiterRelease, fetchEntangledWorldRelease } from '../api/dataManager/loaders.js';
-import { normalizeOrbiterRelease } from '../api/dataManager/normalizers.js';
 import { mountMultiStageStudio } from '../ui/react/studio/MultiStageStudio.tsx';
 import { hideLoadingScreen } from '../boot/loadingScreen.js';
 import { LOAD_PROGRESS_EVENT, LOAD_ERROR_EVENT } from '../boot/loadProgress.js';
 import { isAutofocusEnabled } from '../input/midi/autofocusSettings.js';
 import { KeyboardController } from '../input/KeyboardController.js';
 
-// Every voice in the realm plays over a TRACK audio spine. What a card contributes depends on its
-// entity type: a track card is its own spine; an orbiter card boots over the reference track its
-// author released it with (resolved from the orbiter release on load — see `completeBootEntry`); a
-// world card has NO audio anywhere in the platform (a world release is visuals only), so it can
-// never seed an EMPTY stage. "Bootable" is exactly that — can this card start a stage by itself.
-// Any card can still be dropped on an OCCUPIED stage, where it swaps only its own dimension of the
-// live session (see `swapStage`).
+// Every voice in the realm plays over a TRACK audio spine, and the TRACK is the only entity that
+// carries related entities — a track has a world and an orbiter. Orbiters and worlds each stand on
+// their own and carry no audio: a world release is visuals only, and an orbiter is an instrument,
+// not a recording. The linked ids on an orbiter release name the session its author built and
+// tested it against — an editing reference, never a playback input — so they are not read here.
+// That makes "bootable" (can this card start a stage by itself) exactly "is it a track". Every
+// other card is still fully draggable onto an OCCUPIED stage, where it swaps only its own dimension
+// of that live session (see `swapStage`).
 function isBootableEntry(entry) {
-  return Boolean(entry?.trackId || entry?.orbiterId);
+  return Boolean(entry?.trackId);
 }
 
 // Bounded background release warm-up (see `prefetchReleases`). At `hydrationLevel=1` the collection
@@ -101,9 +101,10 @@ export function createCollectionApp({ collectionData, makeVoiceSession }) {
     console.info(`[collection] primed ${primedCount}/${seededRoster.length} release payloads from the collection fetch — voices booted from these entries skip their own release fetches`);
   }
 
-  // Every entity type shows in the drawer; `bootable` marks whether the card can seed an EMPTY stage
-  // (revocable — an orbiter whose release turns out to carry no reference track). Every card is
-  // draggable regardless: a non-bootable card still swaps its dimension into an occupied stage.
+  // Every entity type shows in the drawer; `bootable` is the studio-facing mirror of
+  // `isBootableEntry` — can this card seed an EMPTY stage. It follows from the entity type alone, so
+  // it never changes after this. Every card is draggable regardless: a non-bootable card still swaps
+  // its dimension into an occupied stage.
   const roster = seededRoster.map((entry) => ({ ...entry, bootable: isBootableEntry(entry) }));
 
   if (!permissions.canView) return renderMessage("You don't have access to this collection.");
@@ -216,51 +217,6 @@ export function createCollectionApp({ collectionData, makeVoiceSession }) {
   let entriesSnapshot = drawerEntries.slice();
   const entryBySourceVoiceId = new Map(drawerEntries.map((entry) => [entry.voiceId, entry]));
 
-  // An orbiter card whose release turns out to carry NO reference track can never boot — flip its
-  // drawer card to the not-bootable state (same as a world card) so the card tells the truth. It
-  // stays draggable: dropping it on an occupied stage still swaps that stage's orbiter. New snapshot
-  // identity so the rail re-renders; the caller's trailing push delivers it.
-  function markEntryUnbootable(sourceVoiceId) {
-    const entry = entryBySourceVoiceId.get(sourceVoiceId);
-    if (!entry || entry.bootable === false) return;
-    entry.bootable = false;
-    entriesSnapshot = drawerEntries.slice();
-  }
-
-  // An orbiter card carries no audio of its own — it boots over the reference track its author
-  // released it with (the release snapshot stores the linked ids; the world it was demoed in rides
-  // along when the placement has none). Cache-first and usually warmed by the collection payload or
-  // the background prefetch; the resolved ids are written INTO the placement so later reconciles
-  // reuse them. The reference track's release is verified HERE, before any voice boots — an
-  // archived/private reference track would otherwise fail mid-session and strand the stage in the
-  // app's fallback session. Returns 'ready' | 'no-reference' (the orbiter can't sound: no linked
-  // track, or its track is gone) | 'error' (transient orbiter fetch failure — a later drop retries).
-  async function completeBootEntry(placement) {
-    if (placement.trackId) return 'ready';
-    if (!placement.orbiterId) return 'no-reference';
-    let release = null;
-    try {
-      // useFallback:false so a fetch failure THROWS (the default returns an error payload for the
-      // assembler) — a transient failure must stay retryable, not read as "no reference track".
-      release = normalizeOrbiterRelease(await fetchOrbiterRelease(placement.orbiterId, { useFallback: false }));
-    } catch (error) {
-      console.warn('[collection] reference-track resolution failed for orbiter', placement.orbiterId, error);
-      return 'error';
-    }
-    if (!release?.referenceTrackId) return 'no-reference';
-    try {
-      await fetchTrackRelease(release.referenceTrackId, { hydrate: 2 });
-    } catch (error) {
-      console.warn('[collection] reference track is not available for orbiter', placement.orbiterId, error);
-      return 'no-reference';
-    }
-    placement.trackId = release.referenceTrackId;
-    if (!placement.entangledWorldId && release.referenceEntangledWorldId) {
-      placement.entangledWorldId = release.referenceEntangledWorldId;
-    }
-    return 'ready';
-  }
-
   // The slot-focus MIDI mapping is orbiter-owned like every other mapping in this app
   // (the backend requires `entityId` to be a real, owned orbiter — there is no collection-scoped
   // identity to persist against). So each slot's binding lives with THAT slot's own real
@@ -357,11 +313,12 @@ export function createCollectionApp({ collectionData, makeVoiceSession }) {
     studio?.update?.({ cruise: { enabled: cruiseEnabled, onToggle: toggleCruise } });
   }
 
-  // Drop-semantics toggle (the drawer toolbar): OFF (default) = a drop on an occupied stage swaps
-  // ONLY the card's own dimension into the playing deck; ON = a bootable card replaces the deck
-  // with its FULL original session (a track with its default orbiter + world; an orbiter with its
-  // reference session). Worlds have no session of their own, so they swap either way.
-  let loadDefaultsEnabled = false;
+  // Drop-semantics toggle (the drawer toolbar): ON (default) = a track replaces the deck with its
+  // FULL session, the world and orbiter it carries — loading a track means loading the track as its
+  // author released it, so that is the default. OFF = a drop on an occupied stage swaps ONLY the
+  // card's own dimension into the playing deck. Only a track has a session of its own, so an
+  // orbiter and a world swap either way.
+  let loadDefaultsEnabled = true;
 
   function toggleLoadDefaults() {
     loadDefaultsEnabled = !loadDefaultsEnabled;
@@ -412,11 +369,11 @@ export function createCollectionApp({ collectionData, makeVoiceSession }) {
     if (disposed || !cruiseEnabled || slotVoiceIds[index] !== endedVoiceId) return;
     const sourceId = slotSourceIds[index];
     const pos = sourceId ? drawerEntries.findIndex((e) => e.voiceId === sourceId) : -1;
-    // The next BOOTABLE entry — a card that can't seed a stage (a world, or an orbiter that turned
-    // out to have no reference track) must not stall the cruise; skip past it.
+    // The next BOOTABLE entry — a card that can't seed a stage (a world: no audio anywhere in the
+    // platform) must not stall the cruise; skip past it.
     let next = null;
     for (let i = pos >= 0 ? pos + 1 : drawerEntries.length; i < drawerEntries.length; i++) {
-      if (drawerEntries[i].bootable !== false && isBootableEntry(drawerEntries[i])) {
+      if (isBootableEntry(drawerEntries[i])) {
         next = drawerEntries[i];
         break;
       }
@@ -482,23 +439,8 @@ export function createCollectionApp({ collectionData, makeVoiceSession }) {
         deferred = true; // stage cell not committed yet (a grow's new stage) — retry after the next frame
         continue;
       }
-      if (!entry.trackId) {
-        // An orbiter placement resolves its track spine here, before the voice boots. On failure the
-        // stage frees again (the placement can't boot); a release with no reference track ALSO flips
-        // its drawer card to not-bootable so the card stops offering a dead boot.
-        const outcome = await completeBootEntry(entry);
-        if (disposed) return;
-        // A drop can land while the resolution awaited (loadStage mutates stageOverrides
-        // synchronously; only the reconcile itself is serialized). If this placement no longer owns
-        // its stage, don't touch the stage either way — the queued reconcile handles the new owner.
-        const stillOwnsStage = stageOverrides.get(index)?.voiceId === entry.voiceId;
-        if (outcome !== 'ready') {
-          if (stillOwnsStage) stageOverrides.set(index, null);
-          if (outcome === 'no-reference') markEntryUnbootable(entry.sourceVoiceId ?? entry.voiceId);
-          continue;
-        }
-        if (!stillOwnsStage) continue;
-      }
+      // Only a track can seed a stage, so a placement always arrives with its own spine — there is
+      // nothing left to resolve before the voice boots (a track placement never had a pre-verify).
       const voiceId = await app.addVoice(entry, index);
       if (disposed) return;
       slotVoiceIds[index] = voiceId ?? null;
@@ -584,7 +526,7 @@ export function createCollectionApp({ collectionData, makeVoiceSession }) {
     if (!entry || index < 0) return;
     const voiceId = slotVoiceIds[index];
     const current = voiceId ? voiceRegistry.get(voiceId)?.dataManager?.activeConfigRequest : null;
-    const canBoot = entry.bootable !== false && isBootableEntry(entry);
+    const canBoot = isBootableEntry(entry);
     if (voiceId && current?.trackId && !(loadDefaultsEnabled && canBoot)) {
       void swapStage(index, voiceId, entry, current);
       return;
@@ -624,8 +566,8 @@ export function createCollectionApp({ collectionData, makeVoiceSession }) {
     // Verify the incoming entity's release BEFORE dispatching (cache-first, usually warm). A dead
     // target (archived/private) must never reach the engine's session-error fallback — that would
     // tear the live session down into a stub. On failure the stage simply keeps playing what it has,
-    // and the drop stays retryable. The orbiter check deliberately ignores its reference track: a
-    // swap keeps the CURRENT track, so an orbiter with an archived reference still swaps fine.
+    // and the drop stays retryable. An orbiter is verified as itself and nothing more — a swap
+    // keeps the stage's CURRENT track, and an orbiter never carries a track of its own.
     try {
       if (swap.dim === 'track') await fetchTrackRelease(entry.trackId, { hydrate: 2 });
       else if (swap.dim === 'orbiter') await fetchOrbiterRelease(entry.orbiterId, { useFallback: false });
@@ -801,11 +743,13 @@ export function createCollectionApp({ collectionData, makeVoiceSession }) {
    * shared cache and its result is ignored.
    */
   function prefetchReleases() {
-    // Warm in drawer order (the first PREFETCH_LIMIT bootable entries). When saved arrangements land,
-    // this is the seam to warm saved-stage items first — not implemented yet. An orbiter entry warms
-    // its ORBITER release (which also reveals its reference track early); a world's release is only
-    // needed if it gets swapped into a live stage, so there is nothing to pre-warm for it.
-    const queue = drawerEntries.filter((entry) => isBootableEntry(entry)).slice(0, PREFETCH_LIMIT);
+    // Warm in drawer order (the first PREFETCH_LIMIT entries that have a release worth warming).
+    // When saved arrangements land, this is the seam to warm saved-stage items first — not
+    // implemented yet. A track entry warms the spine it would boot; an orbiter entry warms its own
+    // release for the swap it can be dropped into. A world's release stays cold, as before.
+    const queue = drawerEntries
+      .filter((entry) => entry.trackId || entry.orbiterId)
+      .slice(0, PREFETCH_LIMIT);
     let cursor = 0;
     const runNext = async () => {
       while (!disposed && cursor < queue.length) {
@@ -841,6 +785,9 @@ export function createCollectionApp({ collectionData, makeVoiceSession }) {
       onLoadStage: loadStage,
       onClearStage: clearStage,
       cruise: { enabled: cruiseEnabled, onToggle: toggleCruise },
+      // Only a track can start a stage. A collection with none would otherwise open onto stages that
+      // silently refuse every card — the studio says so on arrival instead.
+      noPlayableEntries: !roster.some(isBootableEntry),
       loadDefaults: { enabled: loadDefaultsEnabled, onToggle: toggleLoadDefaults },
       onReorderEntries: reorderEntries,
       registerMidiTarget: (binding) => MIDIControllerInstance?.registerMidiLearnTarget(binding),

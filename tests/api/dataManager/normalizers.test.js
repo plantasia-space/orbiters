@@ -25,6 +25,7 @@
 import { describe, it, expect } from 'vitest';
 import {
     normalizeTrackRelease,
+    normalizeOrbiterRelease,
     normalizeOrbiterParameters,
     normalizeOrbiterEffects,
     normalizeWorldRelease,
@@ -512,5 +513,45 @@ describe('normalizeWorldRelease', () => {
         expect(world.artName).toBe('Art');
         expect(world.orbitalPeriod).toBe(365);
         expect(world.moonAmount).toBe(2);
+    });
+});
+
+describe('normalizeOrbiterRelease', () => {
+    it('returns null for a falsy payload', () => {
+        expect(normalizeOrbiterRelease(null)).toBeNull();
+        expect(normalizeOrbiterRelease(undefined)).toBeNull();
+    });
+
+    // An orbiter is a standalone entity. The linked ids an author stores on its release are the
+    // session they built and tested it against — an editing reference, never a playback input. The
+    // normalized shape must not surface them, or a play path can pick them up again and make an
+    // orbiter fail to load whenever its author's track is archived, deleted or private.
+    it('does not lift any linked track/world id out of the release', () => {
+        const orbiter = normalizeOrbiterRelease({
+            orbiterId: 'orb-1',
+            release: {
+                version: 3,
+                metadata: {
+                    orbiterName: 'Standalone',
+                    entitiesPreview: {
+                        trackId: 'reference-track-1',
+                        entangledWorldId: 'reference-world-1',
+                        track: { trackId: 'reference-track-legacy' },
+                        entangledWorld: { worldId: 'reference-world-legacy' },
+                    },
+                },
+            },
+        });
+
+        expect(orbiter.orbiterId).toBe('orb-1');
+        expect(orbiter.version).toBe(3);
+        const serialized = JSON.stringify({
+            ...orbiter,
+            metadata: null, // the raw release metadata is carried through verbatim by design
+        });
+        expect(serialized).not.toContain('reference-track-1');
+        expect(serialized).not.toContain('reference-world-1');
+        expect(serialized).not.toContain('reference-track-legacy');
+        expect(serialized).not.toContain('reference-world-legacy');
     });
 });

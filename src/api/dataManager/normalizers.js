@@ -325,26 +325,10 @@ export function normalizeOrbiterRelease(payload) {
         || release.assets?.orbiterFileURL
         || release.assets?.orbiterFile;
 
-    // The linked-entity ids captured at release time — the author's demo session: the reference
-    // track this orbiter was released over (its canonical "how it sounds") and optionally the world
-    // it was demoed in. New releases store bare ids; legacy payloads may hold hydrated preview
-    // objects, so extract defensively. This is what lets an orbiter card boot as a playable
-    // session even though an orbiter carries no audio of its own.
-    const entitiesPreview =
-        metadata.entitiesPreview && typeof metadata.entitiesPreview === 'object'
-            ? metadata.entitiesPreview
-            : {};
-    const referenceTrackId = firstEntityId(
-        entitiesPreview.trackId,
-        entitiesPreview.track?.trackId,
-        entitiesPreview.track?._id
-    );
-    const referenceEntangledWorldId = firstEntityId(
-        entitiesPreview.entangledWorldId,
-        entitiesPreview.entangledWorld?.worldId,
-        entitiesPreview.entangledWorld?._id
-    );
-
+    // An orbiter is a standalone entity: only a TRACK carries related entities (its world and its
+    // orbiter). The linked ids an author stores on an orbiter release (`metadata.entitiesPreview`)
+    // are the session they built and tested it against — an editing reference, never a playback
+    // input — so nothing is lifted out of them here. Playing an orbiter must not resolve a track.
     return {
         orbiterId: payload.orbiterId || metadata.orbiterId || metadata.id || null,
         version: release.version ?? null,
@@ -366,20 +350,10 @@ export function normalizeOrbiterRelease(payload) {
         orbiterParams: parameters,
         effects,
         orbiterJSONURL,
-        referenceTrackId,
-        referenceEntangledWorldId,
         assets: release.assets || null,
         buildNotes: release.buildNotes || null,
         errorMessage: release.errorMessage || null,
     };
-}
-
-/** The first candidate that is a non-empty id string. Trims; null when none qualifies. */
-function firstEntityId(...candidates) {
-    for (const candidate of candidates) {
-        if (typeof candidate === 'string' && candidate.trim()) return candidate.trim();
-    }
-    return null;
 }
 
 export function normalizeOrbiterParameters(parameters) {

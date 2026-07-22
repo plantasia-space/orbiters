@@ -252,3 +252,72 @@ describe('StretchPlayerPlayback lifecycle', () => {
     expect(sink.isLooping()).toBe(false);
   });
 });
+
+// Autoplay policy holds the AudioContext suspended until a user gesture, and Chrome does not
+// reject resume() in that state — it never settles. Awaiting it unguarded stalled the whole
+// orbiter boot at "Finalizing User Interface", permanently, on any page loaded without a click.
+describe('StretchPlayerPlayback context resume is bounded', () => {
+  function makeSinkWithContext(state, { resumePromise } = {}) {
+    const sink = new StretchPlayerPlayback({ trackData: {} });
+    const context = {
+      state,
+      resume: vi.fn(() => resumePromise ?? Promise.resolve()),
+    };
+    sink.Tone = { getContext: () => ({ rawContext: context }) };
+    return { sink, context };
+  }
+
+  it('returns false instead of hanging when resume never settles', async () => {
+    vi.useFakeTimers();
+    try {
+      // A promise that never settles — exactly what a blocked resume() gives you.
+      const { sink, context } = makeSinkWithContext('suspended', {
+        resumePromise: new Promise(() => {}),
+      });
+
+      const pending = sink._ensureEngineContextRunning();
+      await vi.advanceTimersByTimeAsync(2000);
+
+      await expect(pending).resolves.toBe(false);
+      expect(context.resume).toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('reports true without touching resume when the context already runs', async () => {
+    const { sink, context } = makeSinkWithContext('running');
+    await expect(sink._ensureEngineContextRunning()).resolves.toBe(true);
+    expect(context.resume).not.toHaveBeenCalled();
+  });
+
+  it('reports true when a permitted resume settles', async () => {
+    const { sink, context } = makeSinkWithContext('suspended');
+    context.resume.mockImplementation(async () => {
+      context.state = 'running';
+    });
+    await expect(sink._ensureEngineContextRunning()).resolves.toBe(true);
+  });
+
+  it('a rejected resume reports false rather than throwing', async () => {
+    const { sink } = makeSinkWithContext('suspended', {
+      resumePromise: Promise.reject(new Error('blocked')),
+    });
+    await expect(sink._ensureEngineContextRunning()).resolves.toBe(false);
+  });
+});
+
+// The guard must not cost the engine anything in environments it cannot inspect.
+describe('StretchPlayerPlayback context guard is permissive when it cannot see the context', () => {
+  it('reports true when there is no readable context', async () => {
+    const sink = new StretchPlayerPlayback({ trackData: {} });
+    sink.Tone = { getContext: () => ({ rawContext: null }) };
+    await expect(sink._ensureEngineContextRunning()).resolves.toBe(true);
+  });
+
+  it('reports false for a closed context — it genuinely cannot answer a handshake', async () => {
+    const sink = new StretchPlayerPlayback({ trackData: {} });
+    sink.Tone = { getContext: () => ({ rawContext: { state: 'closed' } }) };
+    await expect(sink._ensureEngineContextRunning()).resolves.toBe(false);
+  });
+});

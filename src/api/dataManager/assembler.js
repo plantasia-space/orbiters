@@ -121,6 +121,7 @@ function createDefaultNotifier() {
     let orbiterFallbackNotified = false;
     let orbiterUnavailableNotified = false;
     let worldUnavailableNotified = false;
+    const tracksNotified = new Set();
 
     return {
         // Fired once per world-preview unavailable (guarded by worldUnavailableNotified).
@@ -176,6 +177,27 @@ function createDefaultNotifier() {
                 if (fired) {
                     worldUnavailableNotified = true;
                 }
+            }
+        },
+        // The requested track could not be loaded → tell the person. Unlike the world and the
+        // orbiter there is no fallback to soften this: without its audio the session does not
+        // assemble at all.
+        //
+        // Deduped per track rather than once per module. The sibling guards above are plain
+        // booleans, which in a shared realm means only the FIRST voice on the page ever
+        // reports — every later card's missing entity is swallowed. Keying by id keeps the
+        // repeat-suppression those guards wanted without hiding a different track's failure.
+        notifyTrackUnavailable(unavailableInfo = null, trackId = null) {
+            const key = trackId ? `id:${trackId}` : 'unknown';
+            if (tracksNotified.has(key)) {
+                return;
+            }
+            const fired = notifyUnavailableEntity(
+                { unavailable: true, ...(unavailableInfo || {}) },
+                'track'
+            );
+            if (fired) {
+                tracksNotified.add(key);
             }
         },
         // Public reset for the orbiter-fallback guard only (matches the exported
@@ -482,12 +504,33 @@ export async function assembleConfig(
         }
     }
 
-    // Fetch and normalize track
-    const trackPayload = await fetchTrackRelease(request.trackId, {
-        version: request.trackVersion,
-        hydrate: hydrateLevel,
-        cache,
-    });
+    // Fetch and normalize track.
+    //
+    // A track that cannot be loaded is reported, never substituted. Standing in another
+    // track's audio would mean the person hears something they did not choose while the form
+    // still shows their selection — a quieter, worse bug than showing nothing. So: say the
+    // audio is unavailable and assemble nothing.
+    let trackPayload = null;
+    try {
+        trackPayload = await fetchTrackRelease(request.trackId, {
+            version: request.trackVersion,
+            hydrate: hydrateLevel,
+            cache,
+        });
+    } catch (error) {
+        if (String(error?.message || '') !== 'track-not-found') {
+            throw error;
+        }
+        // Optional-called: an injected notifier predating this method must not turn a handled
+        // miss into a crash.
+        notify.notifyTrackUnavailable?.(error?.unavailable || { reason: 'missing' }, request.trackId);
+        // Rethrow rather than returning null. The caller turns a null into a generic
+        // "no payload returned", which would discard both the `track-not-found` identity and
+        // the `unavailable` block describing WHY (deleted vs private vs archived) — the detail
+        // that makes this diagnosable in a console and actionable in the UI.
+        throw error;
+    }
+
     if (!trackPayload) {
         console.warn('[DataManager] assembleConfig: no track payload for', request.trackId);
         return null;

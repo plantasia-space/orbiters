@@ -376,7 +376,14 @@ function settleReady(result) {
     }
 }
 
-const dataManager = new DataManager({ eventBus, loadProgress, sharedRealmCache: sharedRealm });
+// The descriptor goes in so this voice's release pin (`trackVersion`) survives all the way to
+// the release fetch — the shared realm's one page URL cannot carry a per-voice version.
+const dataManager = new DataManager({
+    eventBus,
+    loadProgress,
+    sharedRealmCache: sharedRealm,
+    sessionDescriptor,
+});
 
 // This voice's DECK — the one owner of its sync/warp flags, tempo, meter, grid, and beat clock. The
 // coordinator fans each master/status change to it; its shared-clock source reads the realm clock live
@@ -990,6 +997,22 @@ function buildBootstrapSessionDescriptor({ fallbackTrackId }) {
     if (urlWorldId) {
         requested.entangledWorldId = urlWorldId;
     }
+    // The pin rides the descriptor for a realm voice, the URL for the standalone app. A voice
+    // that names `trackVersion` at all is authoritative — including an explicit null, which is
+    // how a card says "back to the live release" and must clear an inherited pin.
+    const voicePinsVersion =
+        sessionDescriptor != null && Object.hasOwn(sessionDescriptor, 'trackVersion');
+    const trackVersion = voicePinsVersion
+        ? sessionDescriptor.trackVersion
+        : INITIAL_URL_PARAMS.get('trackVersion');
+    if (trackVersion != null && trackVersion !== '') {
+        requested.trackVersion = trackVersion;
+    } else if (voicePinsVersion) {
+        // Explicitly unpinned by the voice: drop any pin carried in the session snapshot.
+        delete requested.trackVersion;
+    }
+    // Otherwise leave `requested.trackVersion` as the snapshot had it — a standalone boot with
+    // no pin of its own must not erase a version the existing session already resolved.
 
     const baseTrackId = urlTrackId || fallbackTrackId;
     requested.trackId = baseTrackId;

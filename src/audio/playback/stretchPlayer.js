@@ -61,6 +61,9 @@ let stretchEngineFactoryPromise = null;
 // this finite wrapper: a timeout becomes a normal error the playback layer's
 // existing failure paths can report and revert from.
 const ENGINE_RPC_TIMEOUT_MS = 30 * 1000;
+/** A resume the browser permits settles immediately; one it blocks never settles at all. Short
+ *  by design — this is a "can this context run right now?" probe, not a wait worth sitting out. */
+const CONTEXT_RESUME_TIMEOUT_MS = 2 * 1000;
 
 function withEngineTimeout(promise, label) {
   let timer = null;
@@ -166,12 +169,36 @@ export class StretchPlayerPlayback extends PlayerPlayback {
    *  the play-gesture latch, and setting it on this non-play path would suppress
    *  the real resume triggerPlay owes the context. A no-op when already running,
    *  so the boot/desktop paths are untouched. */
-  async _ensureEngineContextRunning() {
+  async _ensureEngineContextRunning(timeoutMs = CONTEXT_RESUME_TIMEOUT_MS) {
     const rawContext = this.Tone?.getContext?.()?.rawContext ?? this.Tone?.context?.rawContext;
     const context = rawContext ? resolveNativeContext(rawContext) : null;
-    if (context?.state === 'suspended' && typeof context.resume === 'function') {
-      await context.resume();
+    // No inspectable context is not evidence of a suspended one. Say yes and let the bounded
+    // handshakes below be the judge, exactly as before this guard existed — otherwise an
+    // environment whose context simply cannot be read loses the engine for no reason.
+    if (!context || typeof context.state !== 'string') {
+      return true;
     }
+    if (context.state !== 'suspended' || typeof context.resume !== 'function') {
+      return context.state === 'running';
+    }
+    // Chrome does not REJECT resume() when autoplay policy blocks it — it leaves the promise
+    // pending until a user gesture arrives, which on a page that boots without one is never.
+    // Awaiting it unguarded stalls the whole boot, so bound the wait and report back instead
+    // of blocking. A permitted resume settles immediately, so this costs nothing when allowed.
+    let timer = null;
+    try {
+      await Promise.race([
+        context.resume(),
+        new Promise((resolve) => {
+          timer = setTimeout(resolve, timeoutMs);
+        }),
+      ]);
+    } catch (_) {
+      // A rejected resume is just a context that will not run; the caller decides.
+    } finally {
+      clearTimeout(timer);
+    }
+    return context.state === 'running';
   }
 
   async init({ Tone, effectRacks, effectOrder }) {
@@ -190,11 +217,22 @@ export class StretchPlayerPlayback extends PlayerPlayback {
     if (!rawContext) {
       throw new Error('[StretchPlayerPlayback] No raw AudioContext available.');
     }
-    // The engine's construction handshake waits on a processor 'ready' reply,
-    // which only arrives while the context runs (see _ensureEngineContextRunning):
-    // a mid-session unlock builds the engine right after the streamed voice's
-    // teardown, which can suspend the context on mobile — resume or it hangs.
-    await this._ensureEngineContextRunning();
+    // The engine's construction handshake waits on a processor 'ready' reply, which only
+    // arrives while the context runs: a mid-session unlock builds the engine right after the
+    // streamed voice's teardown, which can suspend the context on mobile — resume or it hangs.
+    //
+    // A context that cannot be resumed is not a failure, it is a page that has not been
+    // clicked yet — autoplay policy holds the context suspended until a gesture. Building the
+    // worklet now would hang its handshake for the full RPC timeout and then degrade anyway,
+    // so take the plain sink immediately and let the voice boot.
+    if (!(await this._ensureEngineContextRunning())) {
+      console.info(
+        '[StretchPlayerPlayback] AudioContext still suspended (no user gesture yet) — booting on varispeed playback instead of the time-stretch engine.'
+      );
+      this.node = null;
+      await super.init({ Tone, effectRacks, effectOrder });
+      return;
+    }
     try {
       const SignalsmithStretch = await withEngineTimeout(loadStretchEngineFactory(), 'module load');
       const construction = Promise.resolve(SignalsmithStretch(resolveNativeContext(rawContext)));
@@ -350,7 +388,11 @@ export class StretchPlayerPlayback extends PlayerPlayback {
     // while the AudioContext is running. See _ensureEngineContextRunning: a
     // mid-session unlock reaches here on a context the streamed voice's teardown
     // may have suspended on mobile, or addBuffers waits forever.
-    await this._ensureEngineContextRunning();
+    //
+    // Waits as long as the engine's own RPC timeout, not the short boot probe: reaching here
+    // means a voice is mid-session with a real gesture behind it, so a slow resume is worth
+    // waiting for. Failing fast would only push the same wait onto addBuffers below.
+    await this._ensureEngineContextRunning(ENGINE_RPC_TIMEOUT_MS);
     const channels = [];
     for (let i = 0; i < audioBuffer.numberOfChannels; i += 1) {
       channels.push(audioBuffer.getChannelData(i));

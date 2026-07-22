@@ -328,6 +328,18 @@
         "blocked": "This orbiter is unavailable.",
         "forbidden": "This orbiter is unavailable.",
         "invalid": "Original orbiter unavailable — fallback in use."
+      },
+      "track": {
+        "archived": "Original audio archived — default audio in use.",
+        "deleted": "Original audio deleted — default audio in use.",
+        "missing": "Original audio not found — default audio in use.",
+        "reported": "Original audio reported — default audio in use.",
+        "privacy": "Original audio private — default audio in use.",
+        "moderated": "Original audio moderated — default audio in use.",
+        "suspended": "Original audio suspended — default audio in use.",
+        "blocked": "This audio is unavailable.",
+        "forbidden": "This audio is unavailable.",
+        "invalid": "Original audio unavailable — default audio in use."
       }
     }
   },
@@ -396,6 +408,7 @@
     "resizeDrawer": "Resize drawer",
     "closeCards": "Close cards",
     "official": "Official release",
+    "swapOnlyHint": "Drop onto a playing stage",
     "dock": {
       "prev": "Prev",
       "prevAria": "Previous orbiter",
@@ -416,6 +429,11 @@
     "stage": {
       "emptyHint": "Drop a card here, or double-tap one to load",
       "removeFromStage": "Remove orbiter from stage {{number}}"
+    },
+    "notPlayable": {
+      "title": "Nothing here can be played yet",
+      "body": "Only a track can start a stage. Add a track to this collection to make it playable.",
+      "dismiss": "Got it"
     },
     "confirm": {
       "leaveTitle": "Leave this collection?",

@@ -328,6 +328,18 @@
         "blocked": "Este orbitador no está disponible.",
         "forbidden": "Este orbitador no está disponible.",
         "invalid": "Orbitador original no disponible — usando modo de respaldo."
+      },
+      "track": {
+        "archived": "Audio original archivado — se usa el audio predeterminado.",
+        "deleted": "Audio original eliminado — se usa el audio predeterminado.",
+        "missing": "No se encontró el audio original — se usa el audio predeterminado.",
+        "reported": "Audio original reportado — se usa el audio predeterminado.",
+        "privacy": "Audio original privado — se usa el audio predeterminado.",
+        "moderated": "Audio original moderado — se usa el audio predeterminado.",
+        "suspended": "Audio original suspendido — se usa el audio predeterminado.",
+        "blocked": "Este audio no está disponible.",
+        "forbidden": "Este audio no está disponible.",
+        "invalid": "Audio original no disponible — se usa el audio predeterminado."
       }
     }
   },
@@ -396,6 +408,7 @@
     "resizeDrawer": "Redimensionar el cajón",
     "closeCards": "Cerrar tarjetas",
     "official": "Publicación oficial",
+    "swapOnlyHint": "Suéltalo sobre un escenario en reproducción",
     "dock": {
       "prev": "Ant.",
       "prevAria": "Orbitador anterior",
@@ -416,6 +429,11 @@
     "stage": {
       "emptyHint": "Suelta una tarjeta aquí, o tócala dos veces para cargarla",
       "removeFromStage": "Quitar el orbitador de la posición {{number}}"
+    },
+    "notPlayable": {
+      "title": "Aquí todavía no hay nada que reproducir",
+      "body": "Solo una pista puede iniciar un escenario. Añade una pista a esta colección para poder reproducirla.",
+      "dismiss": "Entendido"
     },
     "confirm": {
       "leaveTitle": "¿Salir de esta colección?",

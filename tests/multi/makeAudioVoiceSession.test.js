@@ -79,7 +79,7 @@ describe('makeOrbiterVoiceSession — compositor wiring', () => {
       removeVoice: vi.fn(),
     };
 
-    makeOrbiterVoiceSession({ entry: { voiceId: 'p', trackId: 't0' }, index: 0, total: 2, isPrimary: true, outputNode: bus, renderHost });
+    makeOrbiterVoiceSession({ entry: { voiceId: 'p', trackId: 't0', trackVersion: 12 }, index: 0, total: 2, isPrimary: true, outputNode: bus, renderHost });
     const secondary = makeOrbiterVoiceSession({ entry: { voiceId: 's', trackId: 't1' }, index: 1, total: 2, isPrimary: false, outputNode: bus, renderHost });
 
     // Every voice is a FULL scene+UI voice that BORROWS the realm's one renderer + canvas (no per-voice
@@ -104,6 +104,12 @@ describe('makeOrbiterVoiceSession — compositor wiring', () => {
     expect(renderHost.createCell).toHaveBeenCalledTimes(2);
     expect(renderHost.addVoice).toHaveBeenCalledWith({ voiceId: 'p', cell: cells[0], controller: controllers[0] });
     expect(renderHost.addVoice).toHaveBeenCalledWith({ voiceId: 's', cell: cells[1], controller: controllers[1] });
+    expect(createOrbitersApp.mock.calls[0][0].sessionDescriptor).toEqual({
+      trackId: 't0',
+      trackVersion: 12,
+      orbiterId: undefined,
+      entangledWorldId: undefined,
+    });
 
     // Dispose unregisters the voice from the compositor.
     secondary.dispose();

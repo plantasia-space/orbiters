@@ -8,6 +8,7 @@
 /** Ordered voice descriptor (roster entry). The realm resolves the rest from the API. */
 export interface VoiceEntry {
   trackId?: string;
+  trackVersion?: number;
   [key: string]: unknown;
 }
 

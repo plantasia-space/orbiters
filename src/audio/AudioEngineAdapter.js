@@ -2997,6 +2997,17 @@ export class AudioEngineAdapter {
       try { chain.outputGain.disconnect(); } catch (_) {}
     });
 
+    // Teardown above always runs; only the re-connect below needs somewhere to connect TO.
+    //
+    // The master bus is built when a session loads. If the load failed there is nothing to
+    // wire into, and every later parameter change would otherwise throw on a null
+    // destination — the engine must stay inert until a session actually arrives, not fail
+    // loudly once per knob. Placed after the disconnects so a bus torn down mid-session still
+    // gets its stale edges cleared rather than left feeding a dead graph.
+    if (!this.bodyLevelGain && !this.masterGain) {
+      return;
+    }
+
     const orderedChains = this._dimensionOrder
       .map((id) => this._dimensionChains.get(id))
       .filter(Boolean);

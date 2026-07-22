@@ -41,6 +41,9 @@ export class WorldSceneController {
     // a sibling voice sharing the renderer is untouched.
     this._postPass = null;
     this._animationFrame = null;
+    this._resizeObserver = null;
+    // Last devicePixelRatio the renderer profile was applied for (see #applySize).
+    this._lastAppliedDpr = null;
     this._renderActive = true;
     this._disposed = false;
     // Right-edge inset (px) reserved for the Orbiter Studio panel; 0 = full-bleed (play mode).
@@ -158,6 +161,13 @@ export class WorldSceneController {
   #bindResize() {
     this._onResize = () => this.#applySize();
     window.addEventListener('resize', this._onResize);
+    // The canvas box is not always the window box: in edit mode the bottom sheet reserves room at the
+    // foot of `.ratio-frame`, which resizes the canvas with no window event to hear. Observe the box
+    // itself — one owner for "the canvas changed size", whatever moved it.
+    if (typeof ResizeObserver === 'function') {
+      this._resizeObserver = new ResizeObserver(() => this.#applySize());
+      this._resizeObserver.observe(this.canvas);
+    }
   }
 
   /**
@@ -181,7 +191,15 @@ export class WorldSceneController {
     this.camera.aspect = width / height;
     applyCameraInsetOffset(this.camera, inset, width, height);
     this.camera.updateProjectionMatrix();
-    this.#applyRendererProfile(this.renderer);
+    // Re-clamp the pixel ratio only when the DISPLAY actually changed (dragging the window to a
+    // second monitor fires a resize). Nothing in the profile depends on the size, and this path now
+    // runs on every canvas box change — including each tick of the edit sheet opening — where
+    // re-running it would reallocate the drawing buffer a second time for nothing.
+    const dpr = Number.isFinite(window.devicePixelRatio) ? window.devicePixelRatio : 1;
+    if (dpr !== this._lastAppliedDpr) {
+      this._lastAppliedDpr = dpr;
+      this.#applyRendererProfile(this.renderer);
+    }
   }
 
   /**
@@ -463,6 +481,10 @@ export class WorldSceneController {
     this._lastFrameTimestamp = null;
     if (this._onResize) {
       window.removeEventListener('resize', this._onResize);
+    }
+    if (this._resizeObserver) {
+      this._resizeObserver.disconnect();
+      this._resizeObserver = null;
     }
     if (this.controls && typeof this.controls.dispose === 'function') {
       this.controls.dispose();

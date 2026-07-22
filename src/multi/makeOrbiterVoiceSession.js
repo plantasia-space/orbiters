@@ -26,7 +26,7 @@ export const VOICE_LOAD_TIMEOUT_MS = 60_000;
 
 /**
  * @param {object} ctx supplied by createMultiOrbiterApp.
- * @param {{voiceId: string, trackId: string, orbiterId?: string, entangledWorldId?: string}} ctx.entry
+ * @param {{voiceId: string, trackId: string, trackVersion?: number, orbiterId?: string, entangledWorldId?: string}} ctx.entry
  * @param {number} ctx.index roster index.
  * @param {number} ctx.total roster length (grid sizing).
  * @param {*} ctx.outputNode the shared master bus (host.getInputNode()).
@@ -66,6 +66,7 @@ export function makeOrbiterVoiceSession({ entry, index, total, outputNode, rende
     eventBus,
     sessionDescriptor: {
       trackId: entry.trackId,
+      trackVersion: entry.trackVersion,
       orbiterId: entry.orbiterId,
       entangledWorldId: entry.entangledWorldId,
     },

@@ -245,6 +245,55 @@ describe('assembleConfig — guards (T8)', () => {
     });
 });
 
+// An unloadable track is reported, never swapped for another. Playing audio the person did
+// not choose, while the form still shows their selection, is a quieter and worse bug than
+// showing nothing at all.
+describe('assembleConfig — unavailable track is reported, never substituted', () => {
+    it('a not-found track tells the user and propagates the specific error', async () => {
+        // Propagated rather than flattened to null: the caller turns a null into a generic
+        // "no payload returned", losing both the `track-not-found` identity and the
+        // `unavailable` block saying whether it was deleted, archived or private.
+        const notFound = Object.assign(new Error('track-not-found'), {
+            unavailable: { reason: 'privacy', fallbackEligible: false },
+        });
+        fetchTrackRelease.mockImplementation(async () => {
+            throw notFound;
+        });
+
+        await expect(
+            assembleConfig({ trackId: 'gone', orbiterId: 'chosen-o', entangledWorldId: 'chosen-w' })
+        ).rejects.toBe(notFound);
+
+        expect(notifications.showToast).toHaveBeenCalled();
+    });
+
+    it('never fetches a second, different track', async () => {
+        // The regression guard: any substitute track would be heard as the chosen one.
+        fetchTrackRelease.mockImplementation(async () => {
+            throw new Error('track-not-found');
+        });
+
+        await assembleConfig({
+            trackId: 'gone',
+            orbiterId: 'chosen-o',
+            entangledWorldId: 'chosen-w',
+        }).catch(() => {});
+
+        expect(fetchTrackRelease).toHaveBeenCalledTimes(1);
+        expect(fetchTrackRelease.mock.calls[0][0]).toBe('gone');
+    });
+
+    it('a non-not-found track error still propagates', async () => {
+        fetchTrackRelease.mockImplementation(async () => {
+            throw new Error('boom');
+        });
+
+        await expect(
+            assembleConfig({ trackId: 't1', entangledWorldId: 'chosen-w' })
+        ).rejects.toThrow('boom');
+    });
+});
+
 describe('assembleConfig — happy path (T3)', () => {
     it('returns combined { track, orbiter, entangledWorld, request } — entangledWorld a sibling AND nested under track', async () => {
         fetchTrackRelease.mockResolvedValue(makeTrackPayload());

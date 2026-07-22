@@ -50,9 +50,10 @@ export interface StationCardEntry {
   image?: string | null;
   entityType?: string | null;
   isOfficial?: boolean | null;
-  /** False when the entry can't seed an EMPTY stage by itself (a world — no audio to mix — or an
-   *  orbiter whose release carries no reference track). Still fully draggable: dropped on an
-   *  occupied stage it swaps its own dimension of that live session, and the caption says so. */
+  /** False when the entry can't seed an EMPTY stage by itself — only a track carries audio, so a
+   *  world (visuals only) and an orbiter (an instrument, not a recording) are both swap-only. Still
+   *  fully draggable: dropped on an occupied stage it swaps its own dimension of that live
+   *  session, and the caption says so. */
   bootable?: boolean;
 }
 
@@ -322,12 +323,11 @@ export function StationTrackCard({
           </div>
         ) : null}
 
-        {/* Swap-only notice — this entry can't start a stage by itself (a world has no audio to mix;
-            an orbiter may lack its reference track) but swaps into a live one. Hidden on the reduced
-            tier like the badge. */}
+        {/* Swap-only notice — this entry carries no audio of its own, so it can't start a stage,
+            but it swaps into a live one. Hidden on the reduced tier like the badge. */}
         {!reduced && swapOnly ? (
           <p style={{ margin: '8px 0 0', textAlign: 'center', fontSize: '0.75rem', color: MUTED_SOFT }}>
-            Drop onto a playing orbiter
+            {getT()('studio.swapOnlyHint', { defaultValue: 'Drop onto a playing stage' })}
           </p>
         ) : null}
 

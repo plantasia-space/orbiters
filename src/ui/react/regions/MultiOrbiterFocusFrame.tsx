@@ -55,8 +55,15 @@ export function MultiOrbiterFocusFrame() {
       aria-hidden="true"
     >
       {/* Corners only — no content; the card fills the tile (its `-card` box is 100%×100%) so the
-          brackets, which are absolute to that box, land at the tile edges. */}
-      <FourCornerCard className="orbiters-react-ui__focus-frame-card" cornerColors={cornerColors}>
+          brackets, which are absolute to that box, land at the tile edges. The card reveals its
+          corners on hover by default, which this frame can never trigger: the wrapper is
+          pointer-events:none and there is nothing focusable inside. These corners ARE the focus
+          state, so they stay on. */}
+      <FourCornerCard
+        className="orbiters-react-ui__focus-frame-card"
+        cornerColors={cornerColors}
+        alwaysShowCorners
+      >
         <></>
       </FourCornerCard>
     </div>

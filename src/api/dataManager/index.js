@@ -37,12 +37,99 @@ import { safeResolveSession, safeUpdateSession } from './sessionBridge.js';
 // Configuration Request Resolution
 // ============================================================================
 
-function resolveConfigRequest(fallbackTrackId) {
+/** Version pins carried on a config request, excluding the track's (which has an alias). */
+const ENTITY_VERSION_KEYS = ['orbiterVersion', 'entangledWorldVersion'];
+
+const isEmptyPin = (value) => value == null || value === '';
+
+/**
+ * Settle every version pin on a config request.
+ *
+ * Two rules, both of which were being broken:
+ *
+ * 1. A key the caller never MENTIONED keeps whatever the active request had. Deleting those too
+ *    meant an override naming only `orbiterId` silently unpinned the track and dropped the voice
+ *    back to the live release. Naming a key with null/'' is still a deliberate unpin.
+ * 2. `version` is a legacy alias of `trackVersion` that the config cache key reads. They are
+ *    settled as ONE value, so they cannot disagree — an alias left pointing at an old pin keyed
+ *    the cache to a version nobody had asked for and served those bytes straight back.
+ *
+ * @param {object} params
+ * @param {object} params.currentRequest the active request being overridden
+ * @param {object} params.sanitizedOverrides overrides with `undefined` values already removed
+ * @param {object} params.nextRequest the merged request, mutated in place
+ * @returns {object} nextRequest
+ */
+/**
+ * Settle `trackVersion` and its legacy `version` alias on a request that is NOT the result of an
+ * override merge — a request resolved straight from the URL or a voice descriptor.
+ *
+ * Same single rule as `resolveRequestVersionPins`, so a request built on either path keys the
+ * config cache identically. Folding the alias by hand at each call site is how the two drifted.
+ *
+ * @param {object} request mutated in place
+ * @returns {object} request
+ */
+export function settleRequestVersionAlias(request) {
+    if (!request) return request;
+    // Key PRESENCE is deliberately left alone. A request resolved from the URL or a descriptor
+    // carries an explicit `trackVersion: null` to mean "live", and downstream (assembleConfig,
+    // buildConfigKey) is built around that shape — dropping the key would change it. Only the
+    // two spellings are reconciled, in whichever direction carries the pin.
+    if (!isEmptyPin(request.trackVersion)) {
+        request.version = request.trackVersion;
+    } else if (!isEmptyPin(request.version)) {
+        request.trackVersion = request.version;
+    }
+    return request;
+}
+
+export function resolveRequestVersionPins({ currentRequest, sanitizedOverrides, nextRequest }) {
+    ENTITY_VERSION_KEYS.forEach((key) => {
+        if (key in sanitizedOverrides) {
+            if (isEmptyPin(sanitizedOverrides[key])) delete nextRequest[key];
+            return;
+        }
+        if (isEmptyPin(nextRequest[key])) delete nextRequest[key];
+    });
+
+    // `trackVersion` wins over `version` when an override names both.
+    const namesTrackVersion =
+        'trackVersion' in sanitizedOverrides || 'version' in sanitizedOverrides;
+    const requested = namesTrackVersion
+        ? ('trackVersion' in sanitizedOverrides
+            ? sanitizedOverrides.trackVersion
+            : sanitizedOverrides.version)
+        : (currentRequest?.trackVersion ?? currentRequest?.version ?? null);
+
+    if (isEmptyPin(requested)) {
+        delete nextRequest.trackVersion;
+        delete nextRequest.version;
+    } else {
+        nextRequest.trackVersion = requested;
+        nextRequest.version = requested;
+    }
+
+    return nextRequest;
+}
+
+function resolveConfigRequest(fallbackTrackId, descriptor = null) {
     const params = new URLSearchParams(window.location.search);
     const trackId = params.get('trackId') || fallbackTrackId;
     const orbiterId = params.get('orbiterId');
     const entangledWorldId = params.get('entangledWorldId');
-    const trackVersion = params.get('trackVersion');
+    // A voice's own version pin wins over the URL. In the shared realm the URL belongs to the
+    // PAGE — every voice reads the same one — so a per-card version can only travel on the
+    // voice's descriptor.
+    //
+    // A descriptor that NAMES trackVersion is authoritative, explicit null included: that is a
+    // card saying "live release", and falling through to a page-level ?trackVersion= would pin
+    // it to a version it deliberately unpinned. Only a descriptor that stays silent (and the
+    // standalone app, which has no descriptor) defers to the URL.
+    const trackVersion =
+        descriptor != null && Object.hasOwn(descriptor, 'trackVersion')
+            ? descriptor.trackVersion
+            : params.get('trackVersion');
     const orbiterVersion = params.get('orbiterVersion');
     const entangledWorldVersion = params.get('entangledWorldVersion');
 
@@ -80,7 +167,10 @@ export class DataManager {
     /**
      * Creates an instance of DataManager.
      */
-    constructor({ eventBus, loadProgress, sharedRealmCache = false } = {}) {
+    constructor({ eventBus, loadProgress, sharedRealmCache = false, sessionDescriptor = null } = {}) {
+        // This voice's own descriptor, carrying any release pin (e.g. `trackVersion`). Realm
+        // voices all share one page URL, so a per-voice pin has no URL param to ride on.
+        this._sessionDescriptor = sessionDescriptor;
         this.cacheExpiryMinutes = Constants.CACHE_EXPIRY_MINUTES || 10;
         // This voice's load-progress reporter. Defaults to a global-mirroring reporter so
         // a bare `new DataManager()` keeps the legacy single-orbiter overlay behavior; multi voices
@@ -185,10 +275,8 @@ export class DataManager {
      */
     async fetchAndUpdateConfig(trackId) {
         try {
-            const request = resolveConfigRequest(trackId);
-            if (request.trackVersion && request.version == null) {
-                request.version = request.trackVersion;
-            }
+            const request = resolveConfigRequest(trackId, this._sessionDescriptor);
+            settleRequestVersionAlias(request);
             this.activeConfigRequest = request;
             const configKey = Constants.buildConfigKey(request);
             this.currentConfigKey = configKey;
@@ -241,15 +329,13 @@ export class DataManager {
      * @returns {Promise<Object>} The track data.
      */
     async fetchTrackData(trackId, overrides = {}) {
-        const baseRequest = resolveConfigRequest(trackId);
+        const baseRequest = resolveConfigRequest(trackId, this._sessionDescriptor);
         const request = {
             ...baseRequest,
             ...Object.fromEntries(Object.entries(overrides).filter(([_, value]) => value !== undefined)),
             trackId,
         };
-        if (request.trackVersion && request.version == null) {
-            request.version = request.trackVersion;
-        }
+        settleRequestVersionAlias(request);
 
         const configKey = Constants.buildConfigKey(request);
         const cached = Constants.getCurrentConfig(configKey);
@@ -401,7 +487,7 @@ export class DataManager {
 
             const currentRequest = this.activeConfigRequest
                 ? { ...this.activeConfigRequest }
-                : { ...resolveConfigRequest(baseTrackId) };
+                : { ...resolveConfigRequest(baseTrackId, this._sessionDescriptor) };
 
             const sanitizedOverrides = Object.fromEntries(
                 Object.entries(overrides).filter(([_, value]) => value !== undefined)
@@ -413,16 +499,7 @@ export class DataManager {
                 trackId: baseTrackId,
             };
 
-            const versionKeys = ['trackVersion', 'orbiterVersion', 'entangledWorldVersion', 'version'];
-            versionKeys.forEach((key) => {
-                if (!(key in sanitizedOverrides) || sanitizedOverrides[key] == null || sanitizedOverrides[key] === '') {
-                    delete nextRequest[key];
-                }
-            });
-
-            if (nextRequest.trackVersion && nextRequest.version == null) {
-                nextRequest.version = nextRequest.trackVersion;
-            }
+            resolveRequestVersionPins({ currentRequest, sanitizedOverrides, nextRequest });
 
             const configKey = Constants.buildConfigKey(nextRequest);
 
@@ -446,14 +523,19 @@ export class DataManager {
             Constants.setCurrentConfig(configKey, combined);
 
             this.currentConfigKey = configKey;
+            // The active request records what was ASKED FOR, not what came back. Every later
+            // override inherits its pins from here, and `combined.*.version` is the version that
+            // was SERVED — for an unpinned request simply the live release's number. Storing that
+            // re-pinned a live voice the moment it loaded, so the next override that did not name
+            // a version inherited a pin nobody had asked for and the voice stopped following live.
             this.activeConfigRequest = {
                 trackId: combined.track?.trackId || nextRequest.trackId,
-                trackVersion: combined.track?.version || nextRequest.trackVersion || null,
+                trackVersion: nextRequest.trackVersion ?? null,
                 orbiterId: combined.orbiter?.orbiterId || nextRequest.orbiterId || null,
-                orbiterVersion: combined.orbiter?.version || nextRequest.orbiterVersion || null,
+                orbiterVersion: nextRequest.orbiterVersion ?? null,
                 entangledWorldId: combined.entangledWorld?.worldId || nextRequest.entangledWorldId || null,
-                entangledWorldVersion: combined.entangledWorld?.version || nextRequest.entangledWorldVersion || null,
-                version: combined.track?.version || nextRequest.version || null,
+                entangledWorldVersion: nextRequest.entangledWorldVersion ?? null,
+                version: nextRequest.version ?? null,
             };
             this._pruneMemoryCaches(this.activeConfigRequest);
 
@@ -463,14 +545,18 @@ export class DataManager {
             this._loadProgress.setStep('orbiterLoaded', !!combined.orbiter);
             this._loadProgress.setStep('modelLoaded', !!combined.entangledWorld);
 
+            // The RESOLVED session still reports the versions actually served — that is what a
+            // resolved descriptor means, and what the host reads to show which version is on
+            // screen. Only the inherited request above is kept as-asked.
             safeResolveSession(
                 {
                     trackId: this.activeConfigRequest.trackId,
-                    trackVersion: this.activeConfigRequest.trackVersion,
+                    trackVersion: combined.track?.version ?? this.activeConfigRequest.trackVersion ?? null,
                     orbiterId: this.activeConfigRequest.orbiterId,
-                    orbiterVersion: this.activeConfigRequest.orbiterVersion,
+                    orbiterVersion: combined.orbiter?.version ?? this.activeConfigRequest.orbiterVersion ?? null,
                     entangledWorldId: this.activeConfigRequest.entangledWorldId,
-                    entangledWorldVersion: this.activeConfigRequest.entangledWorldVersion,
+                    entangledWorldVersion:
+                        combined.entangledWorld?.version ?? this.activeConfigRequest.entangledWorldVersion ?? null,
                 },
                 { source: 'data-manager', status: 'resolved' }
             );

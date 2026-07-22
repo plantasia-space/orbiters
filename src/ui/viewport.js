@@ -129,10 +129,20 @@ function bindViewportHandlers({ renderer, camera, getTrackId, maxDevicePixelRati
         // orbiter into the left region via a camera view-offset. `getViewportInset` is the single
         // source of the panel inset (the controller's `viewportInsetRight`); 0 in play mode = no offset.
         const insetRight = (typeof getViewportInset === 'function' ? Number(getViewportInset()) : 0) || 0;
-        const frameWidth = Math.max(viewportWidth, MIN_SIZE);
-        const frameHeight = Math.max(viewportHeight, MIN_SIZE);
+        // Size to the CANVAS BOX, not the window. The stylesheet owns that box, and in edit mode it is
+        // smaller than the window (`.ratio-frame` gives the open sheet its room back). Deriving it here
+        // a second way — from `innerHeight` minus a reserve — would drift: percentage heights resolve
+        // against the layout viewport while `innerHeight` is the dynamic one, so on a phone the two
+        // disagree by the browser chrome and the drawing buffer ends up a different shape than the box
+        // it is painted into. One box, read once, shared with the scene controller.
+        const box = renderer?.domElement;
+        const frameWidth = Math.max(box?.clientWidth || viewportWidth, MIN_SIZE);
+        const frameHeight = Math.max(box?.clientHeight || viewportHeight, MIN_SIZE);
 
-        renderer.setSize(frameWidth, frameHeight);
+        // `false` = leave the canvas BOX to CSS (it is the input here, so writing it back would be a
+        // feedback loop). Embed/multi paths never reach this handler — they run on the shared
+        // compositor, which sizes with `false` too and styles its own canvases inline.
+        renderer.setSize(frameWidth, frameHeight, false);
         camera.aspect = frameWidth / frameHeight;
         applyCameraInsetOffset(camera, insetRight, frameWidth, frameHeight);
         camera.updateProjectionMatrix();
