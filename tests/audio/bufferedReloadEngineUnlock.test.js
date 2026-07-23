@@ -14,7 +14,7 @@ import { PlayerPlayback } from '../../src/audio/playback/player.js';
 const LONG_TRACK = { durationMs: 20 * 60 * 1000 };
 const GRANULAR_CONFIG = {
   effects: {
-    z: { dimensionId: 'dim-1', modules: [{ effectId: 'granular', moduleId: 'cloud', dimensionId: 'dim-1' }] },
+    z: { dimensionId: 'dim-1', modules: [{ effectId: 'granular', moduleId: 'grains', dimensionId: 'dim-1' }] },
   },
 };
 

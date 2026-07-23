@@ -13,9 +13,10 @@ export class WorkletGranularRenderer {
       density: 12,
       grainSize: 0.12,
       grainPitch: 1,
-      panSpread: 0,
-      positionSpray: 0,
-      pointerSpeed: 1,
+      panSpread: 0.3,
+      positionSpray: 0.04,
+      positionAnchor: -1,
+      seekRate: 0,
       reverseProbability: 0,
       envelopeShape: 0.5,
     };
@@ -23,6 +24,7 @@ export class WorkletGranularRenderer {
     this.framesUntilNextGrain = 0;
     this.pointerSec = 0;
     this.pointerFollowing = true;
+    this.appliedAnchorSec = null;
     this.lastPlayheadSec = 0;
     this.wasActive = false;
     this.currentWet = 0;
@@ -43,6 +45,7 @@ export class WorkletGranularRenderer {
     this.grains.forEach((grain) => { grain.active = false; });
     this.framesUntilNextGrain = 0;
     this.pointerFollowing = true;
+    this.appliedAnchorSec = null;
     this.wasActive = false;
   }
 
@@ -155,13 +158,34 @@ export class WorkletGranularRenderer {
 
     const dt = blockSize / this.sampleRate;
     const jump = Math.abs(playheadSec - this.lastPlayheadSec);
-    if (!this.wasActive || params.pointerSpeed >= 0.999 || jump > dt * 4 + 0.25) {
-      this.pointerSec = playheadSec;
-      this.pointerFollowing = params.pointerSpeed >= 0.999;
+    const durationSec = totalFrames / this.sampleRate;
+    const seekRate = Math.max(-3, Math.min(3, params.seekRate));
+    const anchored = params.positionAnchor >= 0 && durationSec > 0;
+    let pointerStep;
+    if (anchored) {
+      // The anchor is the pointer's HOME: it sits there whenever seek is idle
+      // (including after a seek sweep returns to rest), and seekRate travels
+      // from it while engaged.
+      const anchorSec = Math.max(0, Math.min(1, params.positionAnchor)) * durationSec;
+      const anchorSeeking = Math.abs(seekRate) >= 0.001;
+      if (!anchorSeeking || this.appliedAnchorSec === null || Math.abs(anchorSec - this.appliedAnchorSec) > 1e-6) {
+        this.pointerSec = anchorSec;
+        this.appliedAnchorSec = anchorSec;
+      }
+      this.pointerFollowing = false;
+      pointerStep = seekRate;
+    } else {
+      this.appliedAnchorSec = null;
+      const seeking = Math.abs(seekRate) >= 0.001;
+      if (!this.wasActive || !seeking || jump > dt * 4 + 0.25) {
+        this.pointerSec = playheadSec;
+      }
+      this.pointerFollowing = !seeking;
+      // Decoupled travel runs at playback's natural rate plus the seek offset.
+      pointerStep = this.pointerFollowing
+        ? (Number.isFinite(transportRate) ? transportRate : 1)
+        : 1 + seekRate;
     }
-    const pointerStep = this.pointerFollowing
-      ? (Number.isFinite(transportRate) ? transportRate : 1)
-      : Math.max(0, Math.min(1, params.pointerSpeed));
     const events = this.events;
     events.length = 0;
     const density = Math.max(0.5, Math.min(80, params.density));
@@ -212,6 +236,11 @@ export class WorkletGranularRenderer {
       output[0][frame] += left * this.currentWet;
       if (output[1]) output[1][frame] += right * this.currentWet;
       this.pointerSec += pointerStep / this.sampleRate;
+      if (!this.pointerFollowing) {
+        // An autonomous pointer wraps around the track ends.
+        if (this.pointerSec < 0) this.pointerSec += durationSec;
+        else if (this.pointerSec >= durationSec) this.pointerSec -= durationSec;
+      }
     }
 
     if (events.length) this.emitGrains(events);

@@ -53,7 +53,7 @@ describe('resolvePlaybackStrategy — final sink', () => {
   });
 
   it('the requirement block clears exactly when an override changes the sink', () => {
-    const granular = { x: { modules: [{ effectId: 'granular', moduleId: 'cloud' }] } };
+    const granular = { x: { modules: [{ effectId: 'granular', moduleId: 'grains' }] } };
     const blocked = resolvePlaybackStrategy({ trackData: LONG, effectsConfig: granular });
     expect(blocked.sink).toBe('stream');
     expect(blocked.requirementBlocked).toBe(true);

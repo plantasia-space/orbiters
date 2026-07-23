@@ -24,7 +24,10 @@ Cats have it with abundance."*/
 :root {
     --color1: rgb(255, 255, 255); /* Default color */
     --color2: rgb(187, 187, 187);  /* Hover and active color */
-    --color3: #000000; 
+    /* Color C ("Selected"). Must match DEFAULT_COLOR_C (designUtils.js) — a black
+       default here shadows the success-green fallback chain until the orbiter's own
+       color loads, making selections invisible. */
+    --color3: #33ff41;
     --color4: #ffffff;
     /* MIDI-learn scope colors moved to src/ui/react/orbitersUI.css (the sheet loaded in both
        the native shell and the de-iframed embed, next to the overlay rules that consume them). */

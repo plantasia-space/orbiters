@@ -30,6 +30,7 @@ import { commitTrackBpmFromUi, commitGridMarkerFromUi, resolveEngine } from '../
 import { deckFor, WRAP_GRID_CHANGE_EVENT } from '../../../voice/Deck.js';
 import { parseMeter, DEFAULT_METER_ID } from '../../../sync/meter.js';
 import { useLoopControls, LOOP_SIZES, type LoopControls } from './useLoopControls';
+import { GrainWaveformLayer } from './GrainWaveformLayer';
 import { useNavViewportState } from './useNavViewportState';
 import { usePagedWindow, DEFAULT_WINDOW_SIZE } from 'plantasia.space-design/react';
 import { usePortalContainer } from '../PortalContainerProvider';
@@ -537,6 +538,11 @@ export function KitWaveformPanel() {
               {/* beat / bar grid lines from the track tempo (nothing renders without a BPM). Grid step
                   omitted so the lines coarsen with zoom (dense when zoomed in, thinning as you zoom out). */}
               {projection ? <TimelineGrid projection={projection as unknown as KitProjection} /> : null}
+
+              {/* grain activity — a dot per grain + the spray band while this voice's grain
+                  engine is audible; renders nothing (and costs nothing) otherwise. */}
+              <GrainWaveformLayer voiceId={voiceId} pxPerSec={pxPerSec} />
+
 
               {/* start cue — where playback begins (set by pressing the waveform). Sits below the
                   playhead so the live position stays on top when they overlap (stopped state). */}

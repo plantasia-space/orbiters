@@ -31,7 +31,7 @@ describe('resolvePlaybackStrategy — engine requirement', () => {
   it('a prebuffer-required module resolves buffered on a feasible track', () => {
     const resolution = resolvePlaybackStrategy({
       effectsConfig: {
-        x: { modules: [{ effectId: 'granular', moduleId: 'cloud' }] },
+        x: { modules: [{ effectId: 'granular', moduleId: 'grains' }] },
       },
       trackData: SHORT_TRACK,
     });
@@ -45,7 +45,7 @@ describe('resolvePlaybackStrategy — engine requirement', () => {
   it('a prebuffer-required module on an infeasible track streams, blocked', () => {
     const resolution = resolvePlaybackStrategy({
       effectsConfig: {
-        x: { modules: [{ effectId: 'granular', moduleId: 'cloud' }] },
+        x: { modules: [{ effectId: 'granular', moduleId: 'grains' }] },
       },
       trackData: LONG_TRACK,
     });
@@ -81,7 +81,7 @@ describe('resolvePlaybackStrategy — engine requirement', () => {
     const resolution = resolvePlaybackStrategy({
       effectsConfig: {
         x: { modules: [{ effectId: 'tone.reverb', moduleId: 'small' }] },
-        z: { modules: [{ effectId: 'granular', moduleId: 'haze' }] },
+        z: { modules: [{ effectId: 'granular', moduleId: 'size' }] },
       },
       trackData: SHORT_TRACK,
     });
@@ -91,7 +91,7 @@ describe('resolvePlaybackStrategy — engine requirement', () => {
   it('unknown duration streams + blocks automatically (the explicit unlock is never gated)', () => {
     const resolution = resolvePlaybackStrategy({
       effectsConfig: {
-        x: { modules: [{ effectId: 'granular', moduleId: 'cloud' }] },
+        x: { modules: [{ effectId: 'granular', moduleId: 'grains' }] },
       },
       trackData: {},
     });

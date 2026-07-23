@@ -254,16 +254,83 @@ describe('GranularEngine — pooling', () => {
 });
 
 describe('GranularEngine — pointer', () => {
-  it('freezes the pointer at pointerSpeed 0 and resyncs on a seek', () => {
+  it('follows the playhead by default', () => {
+    const ctx = createFakeContext();
+    const buffer = createSourceBuffer(ctx, 10);
+    const { engine, state } = createEngine({ ctx, buffer });
+    state.positionMs = 5000;
+    engine.attach().setParams({ wet: 0.8, density: 10, grainSize: 0.1 });
+    engine.tick();
+    const grain = ctx.liveSources[ctx.liveSources.length - 1];
+    expect(grain.started.offset).toBeCloseTo(5, 2);
+  });
+
+  it('holds the pointer at an anchored position, ignoring the playhead, and tracks anchor moves', () => {
+    const ctx = createFakeContext();
+    const buffer = createSourceBuffer(ctx, 10);
+    const { engine, state } = createEngine({ ctx, buffer });
+    state.positionMs = 5000;
+    const attachment = engine.attach();
+    attachment.setParams({ wet: 0.8, density: 10, grainSize: 0.1, positionAnchor: 0.3 });
+
+    for (let i = 0; i < 20; i += 1) {
+      state.positionMs += 25;
+      engine.tick();
+      ctx.currentTime += 0.025;
+    }
+    const held = ctx.liveSources[ctx.liveSources.length - 1];
+    expect(held.started.offset).toBeCloseTo(3, 2);
+
+    // The anchor is user-owned: moving it re-places the pointer.
+    attachment.setParams({ wet: 0.8, density: 10, grainSize: 0.1, positionAnchor: 0.8 });
+    engine.tick();
+    ctx.currentTime += 0.025;
+    engine.tick();
+    const moved = ctx.liveSources[ctx.liveSources.length - 1];
+    expect(moved.started.offset).toBeCloseTo(8, 2);
+  });
+
+  it('an anchored pointer travels at seekRate and wraps at the track end', () => {
+    const ctx = createFakeContext();
+    const buffer = createSourceBuffer(ctx, 10);
+    const { engine } = createEngine({ ctx, buffer });
+    engine.attach().setParams({ wet: 0.8, density: 10, grainSize: 0.1, positionAnchor: 0.9, seekRate: 2 });
+    // Anchor at 9 s of 10 s, traveling +2 s/s: after ~1 s it has wrapped past
+    // the end and sits near 1 s.
+    runTicks(engine, ctx, { seconds: 1.025 });
+    const grain = ctx.liveSources[ctx.liveSources.length - 1];
+    expect(grain.started.offset).toBeGreaterThan(0.4);
+    expect(grain.started.offset).toBeLessThan(1.5);
+  });
+
+  it('the pointer returns home to the anchor when a seek sweep comes back to rest', () => {
+    const ctx = createFakeContext();
+    const buffer = createSourceBuffer(ctx, 10);
+    const { engine } = createEngine({ ctx, buffer });
+    const attachment = engine.attach();
+    attachment.setParams({ wet: 0.8, density: 10, grainSize: 0.1, positionAnchor: 0.3, seekRate: 2 });
+    runTicks(engine, ctx, { seconds: 1 });
+
+    // Seek returns to rest: the pointer must sit AT the anchor again, not
+    // wherever the sweep left it.
+    attachment.setParams({ wet: 0.8, density: 10, grainSize: 0.1, positionAnchor: 0.3, seekRate: 0 });
+    engine.tick();
+    ctx.currentTime += 0.025;
+    engine.tick();
+    const grain = ctx.liveSources[ctx.liveSources.length - 1];
+    expect(grain.started.offset).toBeCloseTo(3, 2);
+  });
+
+  it('seekRate -1 without an anchor freezes the pointer and resyncs on a transport seek', () => {
     const ctx = createFakeContext();
     const buffer = createSourceBuffer(ctx, 10);
     const { engine, state } = createEngine({ ctx, buffer });
     state.positionMs = 3000;
-    engine.attach().setParams({ wet: 0.8, density: 10, grainSize: 0.1, pointerSpeed: 0 });
+    // Unanchored travel = playback rate + seekRate, so -1 holds still.
+    engine.attach().setParams({ wet: 0.8, density: 10, grainSize: 0.1, seekRate: -1 });
 
     engine.tick();
     ctx.currentTime += 0.025;
-    // Playhead advances, frozen pointer must not.
     for (let i = 0; i < 20; i += 1) {
       state.positionMs += 25;
       engine.tick();
@@ -281,15 +348,33 @@ describe('GranularEngine — pointer', () => {
     expect(afterSeek.started.offset).toBeCloseTo(8, 1);
   });
 
-  it('follows the playhead exactly at pointerSpeed 1', () => {
+  it('positive seekRate without an anchor runs ahead of the playhead', () => {
     const ctx = createFakeContext();
     const buffer = createSourceBuffer(ctx, 10);
     const { engine, state } = createEngine({ ctx, buffer });
-    state.positionMs = 5000;
-    engine.attach().setParams({ wet: 0.8, density: 10, grainSize: 0.1 });
+    state.positionMs = 3000;
+    engine.attach().setParams({ wet: 0.8, density: 10, grainSize: 0.1, seekRate: 1 });
+
     engine.tick();
+    ctx.currentTime += 0.025;
+    // Playhead advances in real time; the pointer travels at twice that rate.
+    for (let i = 0; i < 20; i += 1) {
+      state.positionMs += 25;
+      engine.tick();
+      ctx.currentTime += 0.025;
+    }
     const grain = ctx.liveSources[ctx.liveSources.length - 1];
-    expect(grain.started.offset).toBeCloseTo(5, 2);
+    expect(grain.started.offset).toBeGreaterThan(3.7);
+    expect(grain.started.offset).toBeLessThan(4.3);
+  });
+});
+
+describe('GranularEngine — defaults', () => {
+  it('defaults to a small nonzero spray so an engaged engine is immediately granular', () => {
+    expect(GRANULAR_PARAM_DEFAULTS.positionSpray).toBeGreaterThan(0);
+    expect(GRANULAR_PARAM_DEFAULTS.positionSpray).toBeLessThan(0.25);
+    expect(GRANULAR_PARAM_DEFAULTS.positionAnchor).toBeLessThan(0);
+    expect(GRANULAR_PARAM_DEFAULTS.seekRate).toBe(0);
   });
 });
 

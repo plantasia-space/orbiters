@@ -1,17 +1,21 @@
 /**
  * @file effects/granular/v1/manifest.js
- * @description Granular texture modules. Every module is a different mapping of
- *              the single rack input onto the shared per-voice granular engine —
- *              one engine, many faces. Modules can be combined across the X/Y/Z
- *              slots; each drives its own parameter subset of the same engine.
+ * @description Grain parameter modules. Every module is one direct granular
+ *              parameter of the single per-voice engine — one engine, one knob
+ *              per parameter. Modules combine across the X/Y/Z slots; each
+ *              drives its own parameter subset of the same engine, so Position
+ *              on X and Spray on Y sculpt one shared grain cloud.
  *
  *              Bipolar control (±180° encoder): the knob spans -100…100 with
  *              equilibrium at 0 (center) = full bypass. Each direction is its
- *              own character via `segments` (negative mappings are written
- *              INVERTED: `min` is the -100 extreme, `max` is the center).
- *              Dry/wet law, same for every module: center = 100% dry / 0% wet,
- *              either extreme = 0% dry / 100% wet — the granular texture
+ *              own reach of the parameter via `segments` (negative mappings are
+ *              written INVERTED: `min` is the -100 extreme, `max` is the
+ *              center). Dry/wet law, same for every module: center = 100% dry /
+ *              0% wet, either extreme = 0% dry / 100% wet — the grain cloud
  *              gradually replaces the dry signal as the knob leaves center.
+ *              Parameters a module does not map sit at the engine defaults,
+ *              which are tuned so any single knob is immediately granular
+ *              (small spray, moderate density, short grains).
  *
  *              The engine reads the voice's decoded buffer, so every module
  *              requires the prebuffer backend.
@@ -81,7 +85,7 @@ function module(id, label, description, segments, secondaryParameters) {
 export const EFFECT_MANIFEST = Object.freeze({
   id: 'granular',
   label: 'Granular',
-  version: '1.0.0',
+  version: '1.1.0',
   inputParam: 'inputParam',
   dimensionId: '*',
   dimensionLabel: 'Granular',
@@ -94,166 +98,148 @@ export const EFFECT_MANIFEST = Object.freeze({
   }),
   modules: Object.freeze([
     module(
-      'cloud',
-      'Cloud',
-      'Grain cloud around the playhead — a smooth wash one way, a dense swarm the other.',
+      'position',
+      'Grain Position',
+      'Grain position — anchor the grain loop point anywhere in the track while the dry voice plays on.',
       {
         negative: {
-          id: 'mist',
-          label: 'Mist',
-          description: 'Negative sweep: few large soft grains, a slow narrow wash.',
+          id: 'early',
+          label: 'Early',
+          description: 'Negative sweep: the loop point moves from the middle back to the very start.',
           parameterMappings: Object.freeze({
-            density: Object.freeze({ min: 8, max: 4 }),
-            grainSize: Object.freeze({ min: 0.35, max: 0.16 }),
-            panSpread: Object.freeze({ min: 0.4, max: 0.2 }),
+            positionAnchor: Object.freeze({ min: 0, max: 0.5 }),
           }),
         },
         positive: {
-          id: 'swarm',
-          label: 'Swarm',
-          description: 'Positive sweep: many small grains spreading across the stereo field.',
+          id: 'late',
+          label: 'Late',
+          description: 'Positive sweep: the loop point moves from the middle out to the very end.',
           parameterMappings: Object.freeze({
-            density: Object.freeze({ min: 4, max: 40 }),
-            grainSize: Object.freeze({ min: 0.16, max: 0.08 }),
-            panSpread: Object.freeze({ min: 0.2, max: 1 }),
+            positionAnchor: Object.freeze({ min: 0.5, max: 1 }),
           }),
         },
       },
-      ['density', 'grainSize', 'panSpread'],
+      ['positionAnchor'],
     ),
     module(
-      'shimmer',
-      'Shimmer',
-      'Grains bend in pitch — down into the depths one way, sparkling up the other.',
+      'spray',
+      'Grain Spray',
+      'Grain spray — how far each grain may land from the read point, from pinpoint focus to wide scatter.',
       {
         negative: {
-          id: 'abyss',
-          label: 'Abyss',
-          description: 'Negative sweep: grains sink up to an octave down as they thicken.',
+          id: 'focus',
+          label: 'Focus',
+          description: 'Negative sweep: spray tightens below the default down to near-pinpoint repetition.',
           parameterMappings: Object.freeze({
-            grainPitch: Object.freeze({ min: 0.5, max: 1 }),
-            density: Object.freeze({ min: 20, max: 6 }),
+            positionSpray: Object.freeze({ min: 0.002, max: 0.04 }),
           }),
         },
         positive: {
-          id: 'sparkle',
-          label: 'Sparkle',
-          description: 'Positive sweep: grains climb up to an octave above the source.',
+          id: 'scatter',
+          label: 'Scatter',
+          description: 'Positive sweep: grains stray further and further around the read point.',
           parameterMappings: Object.freeze({
-            grainPitch: Object.freeze({ min: 1, max: 2 }),
-            density: Object.freeze({ min: 6, max: 28 }),
+            positionSpray: Object.freeze({ min: 0.04, max: 1.2 }),
           }),
         },
       },
-      ['grainPitch', 'density'],
+      ['positionSpray'],
     ),
     module(
-      'drift',
-      'Drift',
-      'Grains wander from the playhead — a soft blur one way, far-flung echoes the other.',
+      'grains',
+      'Grain Count',
+      'Grain count — how many grains sound per second; overlap follows count × size.',
       {
         negative: {
-          id: 'blur',
-          label: 'Blur',
-          description: 'Negative sweep: long overlapping grains smear close around the playhead.',
+          id: 'sparse',
+          label: 'Sparse',
+          description: 'Negative sweep: down to a few distinct grains per second.',
           parameterMappings: Object.freeze({
-            positionSpray: Object.freeze({ min: 0.3, max: 0 }),
-            grainSize: Object.freeze({ min: 0.3, max: 0.14 }),
+            density: Object.freeze({ min: 2, max: 12 }),
           }),
         },
         positive: {
-          id: 'wander',
-          label: 'Wander',
-          description: 'Positive sweep: grains stray further and further from the playhead.',
+          id: 'dense',
+          label: 'Dense',
+          description: 'Positive sweep: up into a thick overlapping cloud.',
           parameterMappings: Object.freeze({
-            positionSpray: Object.freeze({ min: 0, max: 1.5 }),
-            grainSize: Object.freeze({ min: 0.14, max: 0.1 }),
+            density: Object.freeze({ min: 12, max: 60 }),
           }),
         },
       },
-      ['positionSpray', 'grainSize'],
+      ['density'],
     ),
     module(
-      'freeze',
-      'Freeze',
-      'Slow the grain pointer — tape-drag slow motion one way, a frozen hold the other.',
+      'size',
+      'Grain Size',
+      'Grain size — the length of every grain, from micro clicks to long washes.',
       {
         negative: {
-          id: 'drag',
-          label: 'Drag',
-          description: 'Negative sweep: the pointer trails the music in slow motion.',
+          id: 'micro',
+          label: 'Micro',
+          description: 'Negative sweep: grains shrink toward tiny clicks.',
           parameterMappings: Object.freeze({
-            pointerSpeed: Object.freeze({ min: 0.35, max: 1 }),
-            grainSize: Object.freeze({ min: 0.2, max: 0.14 }),
+            grainSize: Object.freeze({ min: 0.02, max: 0.12 }),
           }),
         },
         positive: {
-          id: 'hold',
-          label: 'Hold',
-          description: 'Positive sweep: the pointer slows to a standstill and holds the moment.',
+          id: 'long',
+          label: 'Long',
+          description: 'Positive sweep: grains stretch into long overlapping washes.',
           parameterMappings: Object.freeze({
-            pointerSpeed: Object.freeze({ min: 1, max: 0 }),
-            grainSize: Object.freeze({ min: 0.14, max: 0.3 }),
+            grainSize: Object.freeze({ min: 0.12, max: 0.5 }),
           }),
         },
       },
-      ['pointerSpeed', 'grainSize'],
+      ['grainSize'],
     ),
     module(
-      'scatter',
-      'Scatter',
-      'Grains fly apart — backwards-heavy rewinds one way, stereo confetti the other.',
+      'direction',
+      'Grain Direction',
+      'Grain direction — from every grain reversed, through forward, to a random shuffle of both.',
+      {
+        negative: {
+          id: 'reverse',
+          label: 'Reverse',
+          description: 'Negative sweep: more and more grains play their slice backwards, all of them at the extreme.',
+          parameterMappings: Object.freeze({
+            reverseProbability: Object.freeze({ min: 1, max: 0 }),
+          }),
+        },
+        positive: {
+          id: 'shuffle',
+          label: 'Shuffle',
+          description: 'Positive sweep: a growing random mix of forward and reversed grains.',
+          parameterMappings: Object.freeze({
+            reverseProbability: Object.freeze({ min: 0, max: 0.5 }),
+          }),
+        },
+      },
+      ['reverseProbability'],
+    ),
+    module(
+      'seek',
+      'Grain Seek',
+      'Grain seek — the read point travels through the track on its own, backwards or rushing ahead.',
       {
         negative: {
           id: 'rewind',
           label: 'Rewind',
-          description: 'Negative sweep: more and more grains play their slice in reverse.',
+          description: 'Negative sweep: the read point slows to a halt, then travels backwards through the track.',
           parameterMappings: Object.freeze({
-            reverseProbability: Object.freeze({ min: 0.9, max: 0 }),
-            panSpread: Object.freeze({ min: 0.5, max: 0.2 }),
-            positionSpray: Object.freeze({ min: 0.3, max: 0 }),
+            seekRate: Object.freeze({ min: -3, max: 0 }),
           }),
         },
         positive: {
-          id: 'confetti',
-          label: 'Confetti',
-          description: 'Positive sweep: grains scatter wide across the stereo field.',
+          id: 'rush',
+          label: 'Rush',
+          description: 'Positive sweep: the read point runs ahead, up to three times playback speed.',
           parameterMappings: Object.freeze({
-            reverseProbability: Object.freeze({ min: 0, max: 0.3 }),
-            panSpread: Object.freeze({ min: 0.2, max: 1 }),
-            positionSpray: Object.freeze({ min: 0, max: 0.6 }),
+            seekRate: Object.freeze({ min: 0, max: 2 }),
           }),
         },
       },
-      ['reverseProbability', 'panSpread', 'positionSpray'],
-    ),
-    module(
-      'haze',
-      'Haze',
-      'A veil of soft grains — heavy slow smoke one way, light airy mist the other.',
-      {
-        negative: {
-          id: 'smoke',
-          label: 'Smoke',
-          description: 'Negative sweep: very long, soft-swelling grains thicken into smoke.',
-          parameterMappings: Object.freeze({
-            grainSize: Object.freeze({ min: 0.5, max: 0.16 }),
-            envelopeShape: Object.freeze({ min: 0.9, max: 0.55 }),
-            density: Object.freeze({ min: 10, max: 6 }),
-          }),
-        },
-        positive: {
-          id: 'mist',
-          label: 'Mist',
-          description: 'Positive sweep: shorter airy grains gather into a bright mist.',
-          parameterMappings: Object.freeze({
-            grainSize: Object.freeze({ min: 0.16, max: 0.3 }),
-            envelopeShape: Object.freeze({ min: 0.55, max: 0.8 }),
-            density: Object.freeze({ min: 6, max: 24 }),
-          }),
-        },
-      },
-      ['grainSize', 'envelopeShape', 'density'],
+      ['seekRate'],
     ),
   ]),
 });

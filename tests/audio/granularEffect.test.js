@@ -145,39 +145,44 @@ describe('granular manifest contract', () => {
 });
 
 describe('mapModuleValueToEngineParams', () => {
-  const cloud = EFFECT_MANIFEST.modules.find((module) => module.id === 'cloud');
+  const grains = EFFECT_MANIFEST.modules.find((module) => module.id === 'grains');
+  const position = EFFECT_MANIFEST.modules.find((module) => module.id === 'position');
 
   it('maps the center to bypass', () => {
-    const params = mapModuleValueToEngineParams(cloud, 0);
+    const params = mapModuleValueToEngineParams(grains, 0);
     expect(params.wet).toBe(0);
     expect(params.dryLevel).toBe(1);
   });
 
   it('maps the positive extreme through the positive segment', () => {
-    const params = mapModuleValueToEngineParams(cloud, 100);
+    const params = mapModuleValueToEngineParams(grains, 100);
     expect(params.wet).toBe(1);
     expect(params.dryLevel).toBe(0);
-    expect(params.density).toBeCloseTo(40, 5);
-    expect(params.panSpread).toBeCloseTo(1, 5);
-    expect(params.grainSize).toBeCloseTo(0.08, 5);
+    expect(params.density).toBeCloseTo(60, 5);
   });
 
   it('maps the negative extreme through the inverted negative segment', () => {
-    const params = mapModuleValueToEngineParams(cloud, -100);
+    const params = mapModuleValueToEngineParams(grains, -100);
     expect(params.wet).toBe(1);
     expect(params.dryLevel).toBe(0);
-    expect(params.density).toBeCloseTo(8, 5);
-    expect(params.grainSize).toBeCloseTo(0.35, 5);
+    expect(params.density).toBeCloseTo(2, 5);
+  });
+
+  it('sweeps the position anchor from track start to track end across the knob', () => {
+    expect(mapModuleValueToEngineParams(position, -100).positionAnchor).toBeCloseTo(0, 5);
+    expect(mapModuleValueToEngineParams(position, -50).positionAnchor).toBeCloseTo(0.25, 5);
+    expect(mapModuleValueToEngineParams(position, 50).positionAnchor).toBeCloseTo(0.75, 5);
+    expect(mapModuleValueToEngineParams(position, 100).positionAnchor).toBeCloseTo(1, 5);
   });
 
   it('is proportional inside a segment (half turn = half wet)', () => {
-    expect(mapModuleValueToEngineParams(cloud, 50).wet).toBeCloseTo(0.5, 5);
-    expect(mapModuleValueToEngineParams(cloud, -50).wet).toBeCloseTo(0.5, 5);
+    expect(mapModuleValueToEngineParams(grains, 50).wet).toBeCloseTo(0.5, 5);
+    expect(mapModuleValueToEngineParams(grains, -50).wet).toBeCloseTo(0.5, 5);
   });
 
   it('clamps values outside the range', () => {
-    expect(mapModuleValueToEngineParams(cloud, 250).wet).toBe(1);
-    expect(mapModuleValueToEngineParams(cloud, -250).wet).toBe(1);
+    expect(mapModuleValueToEngineParams(grains, 250).wet).toBe(1);
+    expect(mapModuleValueToEngineParams(grains, -250).wet).toBe(1);
   });
 });
 
@@ -196,19 +201,18 @@ describe('granular effect factory', () => {
 
   it('drives the engine through the active module and bypasses back at center', () => {
     const effect = createEffect();
-    const cloud = effect.modules.find((module) => module.id === 'cloud');
-    cloud.applyValue(100);
+    const position = effect.modules.find((module) => module.id === 'position');
+    position.applyValue(100);
 
     const engine = peekEngine(controller);
     expect(engine).toBeTruthy();
     const params = engine.getParams();
     expect(params.wet).toBe(1);
     expect(params.dryLevel).toBe(0);
-    // density 40 × grainSize 0.08 sits inside the overlap budget — no clamp.
-    expect(params.density).toBeCloseTo(40, 5);
+    expect(params.positionAnchor).toBeCloseTo(1, 5);
     expect(controller.connect).toHaveBeenCalledTimes(1);
 
-    cloud.applyValue(0);
+    position.applyValue(0);
     expect(engine.getParams().wet).toBe(0);
     expect(engine.getParams().dryLevel).toBe(1);
     effect.dispose();
@@ -216,34 +220,34 @@ describe('granular effect factory', () => {
 
   it('switching modules within the slot clears the previous module\'s params', () => {
     const effect = createEffect();
-    effect.modules.find((module) => module.id === 'cloud').applyValue(100);
+    effect.modules.find((module) => module.id === 'position').applyValue(100);
     const engine = peekEngine(controller);
-    expect(engine.getParams().panSpread).toBeCloseTo(1, 5);
+    expect(engine.getParams().positionAnchor).toBeCloseTo(1, 5);
 
-    effect.configureModule('shimmer');
-    effect.modules.find((module) => module.id === 'shimmer').applyValue(50);
+    effect.configureModule('seek');
+    effect.modules.find((module) => module.id === 'seek').applyValue(50);
     const params = engine.getParams();
-    expect(params.panSpread).toBe(GRANULAR_PARAM_DEFAULTS.panSpread);
-    expect(params.grainPitch).toBeCloseTo(1.5, 5);
+    expect(params.positionAnchor).toBe(GRANULAR_PARAM_DEFAULTS.positionAnchor);
+    expect(params.seekRate).toBeCloseTo(1, 5);
     effect.dispose();
   });
 
   it('inactive modules ignore applyValue', () => {
     const effect = createEffect();
-    const shimmer = effect.modules.find((module) => module.id === 'shimmer');
-    shimmer.applyValue(80);
+    const seek = effect.modules.find((module) => module.id === 'seek');
+    seek.applyValue(80);
     const engine = peekEngine(controller);
-    expect(engine.getParams().grainPitch).toBe(GRANULAR_PARAM_DEFAULTS.grainPitch);
+    expect(engine.getParams().seekRate).toBe(GRANULAR_PARAM_DEFAULTS.seekRate);
     effect.dispose();
   });
 
   it('two slots share one engine, each driving its own parameter subset', () => {
     const slotX = createEffect();
     const slotY = createEffect();
-    slotY.configureModule('shimmer');
+    slotY.configureModule('seek');
 
-    slotX.modules.find((module) => module.id === 'cloud').applyValue(50);
-    slotY.modules.find((module) => module.id === 'shimmer').applyValue(100);
+    slotX.modules.find((module) => module.id === 'position').applyValue(50);
+    slotY.modules.find((module) => module.id === 'seek').applyValue(100);
 
     expect(controller.connect).toHaveBeenCalledTimes(1);
     const engine = peekEngine(controller);
@@ -251,13 +255,13 @@ describe('granular effect factory', () => {
     // wet resolves as max, dryLevel as min across modules.
     expect(params.wet).toBe(1);
     expect(params.dryLevel).toBe(0);
-    expect(params.panSpread).toBeCloseTo(0.6, 5);
-    expect(params.grainPitch).toBeCloseTo(2, 5);
+    expect(params.positionAnchor).toBeCloseTo(0.75, 5);
+    expect(params.seekRate).toBeCloseTo(2, 5);
 
     // Dropping one slot keeps the shared engine alive for the other.
     slotY.dispose();
     expect(peekEngine(controller)).toBe(engine);
-    expect(engine.getParams().grainPitch).toBe(GRANULAR_PARAM_DEFAULTS.grainPitch);
+    expect(engine.getParams().seekRate).toBe(GRANULAR_PARAM_DEFAULTS.seekRate);
     expect(engine.getParams().wet).toBeCloseTo(0.5, 5);
 
     // Last slot out tears the engine down.

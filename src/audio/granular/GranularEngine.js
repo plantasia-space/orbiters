@@ -5,11 +5,15 @@
  *              and Signalsmith share one PCM store. The native buffer-source
  *              renderer remains for the classic fallback sink.
  *
- *              The engine is a SOURCE-LEVEL companion to the dry player: it
- *              follows the player's playhead
- *              (pointer = playhead + offset/spray), and mixes its wet output
+ *              The engine is a SOURCE-LEVEL companion to the dry player: by
+ *              default its read pointer follows the player's playhead
+ *              (pointer = playhead + spray), and mixes its wet output
  *              into the same bus the dry signal feeds, so transport, seek and
- *              loop behavior stay owned by the player.
+ *              loop behavior stay owned by the player. Two parameters detach
+ *              the pointer from the playhead: `positionAnchor` pins it to an
+ *              absolute spot in the track, and `seekRate` sends it traveling
+ *              on its own (wrapping at the track ends). The dry player is
+ *              never affected either way.
  *
  *              One engine per voice; several control modules can attach to it,
  *              each driving its own subset of the parameter surface. Wet is
@@ -36,11 +40,19 @@ export const GRANULAR_PARAM_DEFAULTS = Object.freeze({
   /** Per-grain playback rate (pitch ratio; 1 = source pitch). */
   grainPitch: 1,
   /** Random stereo placement width (0 = center, 1 = full width). */
-  panSpread: 0,
-  /** Random pointer jitter in seconds (bidirectional around the pointer). */
-  positionSpray: 0,
-  /** Pointer advance rate relative to the playhead (1 = follow, 0 = frozen). */
-  pointerSpeed: 1,
+  panSpread: 0.3,
+  /** Random pointer jitter in seconds (bidirectional around the pointer).
+   *  Defaults to a small nonzero spray so an engaged engine is immediately
+   *  granular rather than a plain echo of the playhead. */
+  positionSpray: 0.04,
+  /** Normalized read-pointer anchor (0 = track start … 1 = end). Negative =
+   *  unanchored: the pointer follows the playhead. */
+  positionAnchor: -1,
+  /** Autonomous pointer travel, in seconds per second, added to the mode's
+   *  natural rate (anchored: 0 = hold the anchor; unanchored: 1 = playback
+   *  rate, so -2 travels backwards at 1×). Nonzero decouples the pointer;
+   *  it then wraps at the track ends. */
+  seekRate: 0,
   /** Chance (0–1) that a grain plays its slice reversed. */
   reverseProbability: 0,
   /** Envelope attack fraction of the grain (0.05 sharp … 0.95 soft swell). */
@@ -52,8 +64,9 @@ const MIN_GRAIN_SEC = 0.02;
 const MAX_GRAIN_SEC = 0.5;
 const MIN_DENSITY = 0.5;
 const MAX_DENSITY = 80;
-/** Pointer speeds this close to 1 follow the playhead exactly (no drift). */
-const FOLLOW_EPSILON = 0.999;
+/** Seek rates this close to 0 keep the unanchored pointer glued to the playhead. */
+const SEEK_EPSILON = 0.001;
+const MAX_SEEK_RATE = 3;
 /** Poll cadence while attached + engaged but transport is stopped. */
 const IDLE_TICK_MS = 250;
 
@@ -138,6 +151,7 @@ export class GranularEngine {
 
     this._pointerSec = 0;
     this._pointerFollowing = true;
+    this._appliedAnchorSec = null;
     this._lastPlayheadSec = 0;
     this._lastTickTime = null;
 
@@ -282,7 +296,8 @@ export class GranularEngine {
     if (merged.density * merged.grainSize > this._maxOverlap) {
       merged.density = this._maxOverlap / merged.grainSize;
     }
-    merged.pointerSpeed = clamp(merged.pointerSpeed, 0, 1);
+    merged.positionAnchor = clamp(merged.positionAnchor, -1, 1);
+    merged.seekRate = clamp(merged.seekRate, -MAX_SEEK_RATE, MAX_SEEK_RATE);
     merged.reverseProbability = clamp01(merged.reverseProbability);
     merged.panSpread = clamp01(merged.panSpread);
     merged.envelopeShape = clamp(merged.envelopeShape, 0.05, 0.95);
@@ -383,30 +398,54 @@ export class GranularEngine {
     }
     this._scratchPool.length = 0;
     this._pointerFollowing = true;
+    this._appliedAnchorSec = null;
   }
 
   _updatePointer(now, params) {
     const playheadSec = Math.max(0, Number(this._getPositionMs()) / 1000 || 0);
     const dt = this._lastTickTime === null ? 0 : Math.max(0, now - this._lastTickTime);
     this._lastTickTime = now;
+    const duration = this._bufferDurationSec;
+    const anchored = params.positionAnchor >= 0 && duration > 0;
 
-    if (params.pointerSpeed >= FOLLOW_EPSILON || this._pointerFollowing !== false) {
-      // Follow mode (and the first tick after any reset): pointer = playhead.
-      this._pointerSec = playheadSec;
-      this._pointerFollowing = params.pointerSpeed >= FOLLOW_EPSILON;
-    } else {
-      // Decoupled pointer (Freeze-style): advance at pointerSpeed, but any
-      // playhead jump (seek, loop wrap) snaps the pointer back to transport
-      // truth — the engine never fights the transport.
-      const jump = Math.abs(playheadSec - this._lastPlayheadSec);
-      if (jump > dt * 4 + 0.25) {
-        this._pointerSec = playheadSec;
+    if (anchored) {
+      // The anchor is the pointer's HOME: it sits there whenever seek is idle
+      // (including after a seek sweep returns to rest), and seekRate travels
+      // from it while engaged.
+      const anchorSec = clamp(params.positionAnchor, 0, 1) * duration;
+      const seeking = Math.abs(params.seekRate) >= SEEK_EPSILON;
+      if (!seeking || this._appliedAnchorSec === null || Math.abs(anchorSec - this._appliedAnchorSec) > 1e-6) {
+        this._pointerSec = anchorSec;
+        this._appliedAnchorSec = anchorSec;
       } else {
-        this._pointerSec += dt * params.pointerSpeed;
+        this._pointerSec += dt * params.seekRate;
+      }
+      this._pointerFollowing = false;
+    } else {
+      this._appliedAnchorSec = null;
+      if (Math.abs(params.seekRate) < SEEK_EPSILON || this._pointerFollowing !== false) {
+        // Follow mode (and the first tick after any reset): pointer = playhead.
+        this._pointerSec = playheadSec;
+        this._pointerFollowing = Math.abs(params.seekRate) < SEEK_EPSILON;
+      } else {
+        // Decoupled travel: playback's natural rate plus the seek offset, but
+        // any playhead jump (seek, loop wrap) snaps the pointer back to
+        // transport truth — the engine never fights the transport.
+        const jump = Math.abs(playheadSec - this._lastPlayheadSec);
+        if (jump > dt * 4 + 0.25) {
+          this._pointerSec = playheadSec;
+        } else {
+          this._pointerSec += dt * (1 + params.seekRate);
+        }
       }
     }
-    if (this._bufferDurationSec > 0) {
-      this._pointerSec = clamp(this._pointerSec, 0, this._bufferDurationSec);
+    if (duration > 0) {
+      if (this._pointerFollowing) {
+        this._pointerSec = clamp(this._pointerSec, 0, duration);
+      } else {
+        // An autonomous pointer wraps around the track ends.
+        this._pointerSec = ((this._pointerSec % duration) + duration) % duration;
+      }
     }
     this._lastPlayheadSec = playheadSec;
   }

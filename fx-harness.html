@@ -26,6 +26,33 @@
       .module .name { font-weight: 600; }
       .desc { grid-column: 2 / 4; color: #8b9099; font-size: 12px; margin-top: -6px; }
       label.toggle { display: inline-flex; gap: 6px; align-items: center; color: #8b9099; }
+      .waveviz {
+        position: relative; height: 110px; margin: 12px 0; border: 1px solid #262b35;
+        border-radius: 6px; overflow: hidden; cursor: crosshair; touch-action: none;
+      }
+      .waveviz canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+      .waveviz-playhead {
+        position: absolute; top: 0; bottom: 0; width: 1px; background: #e6e8ec;
+        opacity: 0; pointer-events: none;
+      }
+      .waveviz-spray {
+        position: absolute; top: 0; bottom: 0; transform: translateX(-50%);
+        background: rgba(0, 139, 219, 0.28); opacity: 0; pointer-events: none;
+      }
+      .waveviz-grain {
+        position: absolute; height: 6px; border-radius: 3px;
+        background: #ffd479; margin-top: -3px; pointer-events: none;
+        animation: waveviz-grain-life linear forwards;
+      }
+      /* Reversed grains read as hollow pills — direction as a defined mark, not motion. */
+      .waveviz-grain--reversed {
+        background: transparent; border: 1.5px solid #ffd479; box-sizing: border-box;
+      }
+      /* Solid for the grain's life, then a snap exit — a readout, not a motion effect. */
+      @keyframes waveviz-grain-life {
+        0%, 85% { opacity: 1; }
+        100% { opacity: 0; }
+      }
       pre { background: #181b22; border: 1px solid #262b35; border-radius: 6px; padding: 10px; font-size: 12px; overflow-x: auto; }
     </style>
   </head>

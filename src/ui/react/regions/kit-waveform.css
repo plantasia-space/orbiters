@@ -503,3 +503,43 @@
   width: 15px;
   height: 15px;
 }
+
+/* Grain activity over the waveform — one solid pill per grain spawn (spanning its audio slice) plus a translucent
+   band marking the spray range around the read point. Pointer-events off: the layer is
+   pure display and must never eat the play-cursor / loop / playhead gestures. Sits above
+   the waveform + grid, below the loop band (z-10) and playhead (z-20). */
+.kit-waveform__grain-layer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 4;
+}
+.kit-waveform__grain-spray {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  transform: translateX(-50%);
+  background: rgba(255, 255, 255, 0.16);
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+.kit-waveform__grain-dot {
+  position: absolute;
+  height: 6px;
+  margin-top: -3px;
+  border-radius: 3px;
+  background: var(--color3, var(--color1, #ffffff));
+  animation: kit-waveform-grain-life linear forwards;
+}
+/* Reversed grains read as hollow pills — direction as a defined mark, not motion. */
+.kit-waveform__grain-dot--reversed {
+  background: transparent;
+  border: 1.5px solid var(--color3, var(--color1, #ffffff));
+  box-sizing: border-box;
+}
+/* Solid for the grain's life, then a snap exit — a readout, not a motion effect. */
+@keyframes kit-waveform-grain-life {
+  0%, 85% { opacity: 1; }
+  100% { opacity: 0; }
+}

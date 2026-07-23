@@ -428,6 +428,7 @@ export class DesignPanel {
     return {
       colorPrimary: this.design.colorPrimary,
       colorSecondary: this.design.colorSecondary,
+      colorC: this.design.colorC,
       roundedCorners: this.design.roundedCorners,
       frameBorderWidth: this.design.frameBorderWidth,
       ringColor: this.design.ringColor,
@@ -460,6 +461,8 @@ export class DesignPanel {
 
     assignIfDifferent('colorPrimary', snapshot.colorPrimary);
     assignIfDifferent('colorSecondary', snapshot.colorSecondary);
+    // Snapshots taken before Color C existed carry no colorC — keep the current one then.
+    assignIfDifferent('colorC', snapshot.colorC ?? this.design.colorC);
     assignIfDifferent('roundedCorners', snapshot.roundedCorners);
     assignIfDifferent('frameBorderWidth', snapshot.frameBorderWidth);
     assignIfDifferent('ringColor', snapshot.ringColor);
