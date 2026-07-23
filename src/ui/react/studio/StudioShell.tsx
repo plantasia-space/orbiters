@@ -62,6 +62,11 @@ const SHEET_DVH = 40;
 // orbiter canvas re-fits). Unset = 0 when the sheet is closed and on desktop.
 const SHEET_RESERVE_VAR = '--orb-studio-sheet-reserve';
 
+// Whether the sheet is up, remembered for as long as this page (in the release form, this iframe) is
+// loaded. Module scope so it survives the shell being unmounted and remounted by a re-bootstrap; it
+// starts `true` so edit mode opens showing the panel, and after that it is the person's own choice.
+let sheetOpenThisLoad = true;
+
 export interface StudioShellProps {
   children: ReactNode;
   /** Renders the bridge-backed panel body for a mode; `showToggle` is true only on desktop. */
@@ -82,11 +87,16 @@ function useModeLabels(): Record<PanelMode, string> {
 export function StudioShell({ children, renderPanel }: StudioShellProps) {
   const isMobile = useIsMobileNav();
   const [mode, setMode] = useState<PanelMode>('engine');
-  // Edit mode opens with the sheet already up, on Engine. Arriving to a bare orbiter left the edit
-  // controls behind an unlabelled tap — showing the panel is what tells you the bar is there and
-  // which button opened it. Closing is still one tap on the lit mode. Desktop ignores this: that
-  // branch renders the rail, not the drawer.
-  const [drawerOpen, setDrawerOpen] = useState(true);
+  // Edit mode opens with the sheet already up, on Engine — arriving to a bare orbiter left the edit
+  // controls behind an unlabelled tap, and showing the panel is what tells you the bar is there and
+  // which button opened it. Closing is one tap on the lit mode. Desktop ignores this: that branch
+  // renders the rail, not the drawer.
+  // ONCE per page load, though, not once per mount: choosing a different track or world re-bootstraps
+  // the app, which unmounts this shell and mounts a new one (see mountOrbitersUI). A plain `true`
+  // default therefore re-opened the sheet — reversing the person's own close — every time they picked
+  // an entity. `sheetOpenThisLoad` outlives the remount and carries their last choice across it.
+  const [drawerOpen, setDrawerOpen] = useState(sheetOpenThisLoad);
+  useEffect(() => { sheetOpenThisLoad = drawerOpen; }, [drawerOpen]);
   const labels = useModeLabels();
 
   // CHROME theme: the shell panel follows the USER's chosen preset from `/me/users/settings`
@@ -190,7 +200,13 @@ export function StudioShell({ children, renderPanel }: StudioShellProps) {
   // close, on desktop, and on unmount.
   useEffect(() => {
     const root = document.documentElement;
-    const clear = () => root.style.removeProperty(SHEET_RESERVE_VAR);
+    // Writing the reserve resizes the canvas through CSS, which announces itself to nobody. Tell the
+    // scene controller directly so the renderer and camera re-fit in the same turn; the canvas
+    // ResizeObserver stays as the backstop for box changes this effect doesn't cause.
+    const refit = () => (window as unknown as {
+      __orbitersRefitViewport?: () => void;
+    }).__orbitersRefitViewport?.();
+    const clear = () => { root.style.removeProperty(SHEET_RESERVE_VAR); refit(); };
     if (!isMobile || !drawerOpen) { clear(); return undefined; }
     let ro: ResizeObserver | null = null;
     let mo: MutationObserver | null = null;
@@ -206,6 +222,7 @@ export function StudioShell({ children, renderPanel }: StudioShellProps) {
       measure = () => {
         const px = sheetEl.offsetHeight + (barEl?.offsetHeight ?? 0);
         root.style.setProperty(SHEET_RESERVE_VAR, `${Math.round(px)}px`);
+        refit();
       };
       measure();
       ro = new ResizeObserver(measure);

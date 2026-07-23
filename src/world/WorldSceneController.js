@@ -73,6 +73,11 @@ export class WorldSceneController {
       // `window.__EW_setEditViewport`). One controller is active at a time, so last-writer-wins is fine.
       if (typeof window !== 'undefined') {
         window.__orbitersSetViewportInset = (rightPx) => this.setViewportInset(rightPx);
+        // ...and let it say "the canvas box just changed" after a CSS-driven resize (the mobile edit
+        // sheet writes a reserve var). Nothing announces such a change, so without this the re-fit
+        // waits on the ResizeObserver — and if that tick is late or never delivered, the drawing
+        // buffer keeps the OLD shape while the box has the new one, and the orbiter renders stretched.
+        window.__orbitersRefitViewport = () => this.#applySize();
       }
     }
   }
@@ -212,8 +217,8 @@ export class WorldSceneController {
     this.#applySize();
   }
 
-  /** The right-edge inset (px) reserved by the Studio panel — the ONE value any other resize owner
-   *  (e.g. `bindViewportHandlers`) must subtract so it frames the SAME left region, not the full tab. */
+  /** The right-edge inset (px) reserved by the Studio panel. This controller is the only resize owner
+   *  — nothing else sizes the renderer or the camera — so this is read, not mirrored, elsewhere. */
   get viewportInsetRight() {
     return this._viewportInsetRight;
   }
@@ -497,6 +502,7 @@ export class WorldSceneController {
     if (this._ownsRenderer) {
       this.renderer.dispose();
       delete window.__orbitersSetViewportInset;
+      delete window.__orbitersRefitViewport;
       if (window.__orbitersFrameStats) {
         delete window.__orbitersFrameStats;
       }

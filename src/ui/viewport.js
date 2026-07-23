@@ -98,58 +98,31 @@ function applyCameraInsetOffset(camera, insetRight, frameWidth, frameHeight) {
     }
 }
 
-function getCssRootVarPx(varName, fallback = 220) {
-    if (typeof window === 'undefined') return fallback;
-    const val = getComputedStyle(document.documentElement).getPropertyValue(varName);
-    const px = parseInt(val, 10);
-    return isNaN(px) ? fallback : px;
-}
 /**
- * Binds resize/orientation listeners that keep the renderer and camera aligned with the viewport.
+ * Binds resize/orientation listeners for the things that follow the WINDOW: the nav viewport state
+ * and the world-size message to the host. Renderer size and camera aspect are NOT bound here — they
+ * follow the canvas BOX and belong to `WorldSceneController`.
  * Returns a disposer to remove the bindings if needed.
  * @param {Object} params
  * @param {import('three').WebGLRenderer} params.renderer
- * @param {import('three').Camera} params.camera
  * @param {Function} [params.getTrackId]
  * @returns {Function} disposer
  */
-function bindViewportHandlers({ renderer, camera, getTrackId, maxDevicePixelRatio = 2, getViewportInset }) {
+function bindViewportHandlers({ renderer, getTrackId }) {
     if (typeof window === 'undefined') {
         return () => {};
     }
 
-    const MIN_SIZE = getCssRootVarPx('--orbiters-min-size', 220);
-
     const handleViewportResize = () => {
-        const viewportWidth = window.innerWidth;
-        const viewportHeight = window.innerHeight;
-        applyNavViewportState(viewportWidth, viewportHeight);
+        applyNavViewportState(window.innerWidth, window.innerHeight);
 
-        // Keep the canvas FULL-WIDTH (the scene renders behind the frosted Studio panel) and shift the
-        // orbiter into the left region via a camera view-offset. `getViewportInset` is the single
-        // source of the panel inset (the controller's `viewportInsetRight`); 0 in play mode = no offset.
-        const insetRight = (typeof getViewportInset === 'function' ? Number(getViewportInset()) : 0) || 0;
-        // Size to the CANVAS BOX, not the window. The stylesheet owns that box, and in edit mode it is
-        // smaller than the window (`.ratio-frame` gives the open sheet its room back). Deriving it here
-        // a second way — from `innerHeight` minus a reserve — would drift: percentage heights resolve
-        // against the layout viewport while `innerHeight` is the dynamic one, so on a phone the two
-        // disagree by the browser chrome and the drawing buffer ends up a different shape than the box
-        // it is painted into. One box, read once, shared with the scene controller.
-        const box = renderer?.domElement;
-        const frameWidth = Math.max(box?.clientWidth || viewportWidth, MIN_SIZE);
-        const frameHeight = Math.max(box?.clientHeight || viewportHeight, MIN_SIZE);
-
-        // `false` = leave the canvas BOX to CSS (it is the input here, so writing it back would be a
-        // feedback loop). Embed/multi paths never reach this handler — they run on the shared
-        // compositor, which sizes with `false` too and styles its own canvases inline.
-        renderer.setSize(frameWidth, frameHeight, false);
-        camera.aspect = frameWidth / frameHeight;
-        applyCameraInsetOffset(camera, insetRight, frameWidth, frameHeight);
-        camera.updateProjectionMatrix();
-        const profileMax =
-            renderer?.userData?.performanceProfile?.maxDevicePixelRatio ?? maxDevicePixelRatio;
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio, profileMax));
-
+        // Sizing is NOT done here. `WorldSceneController` owns the renderer size and camera aspect: it
+        // fits them to the canvas BOX, and watches that box with a ResizeObserver as well as this
+        // event. A second owner here could only ever agree with it or contradict it — and it did
+        // contradict it, clamping the render to a minimum the box is allowed to go below (edit mode's
+        // sheet), so the drawing buffer was a different shape than the box it is painted into and the
+        // orbiter rendered stretched. This handler keeps only what is its own: the nav viewport state
+        // and telling the host how big the world is.
         if (renderer) {
             const trackId = typeof getTrackId === 'function' ? getTrackId() : null;
             sendWorldSize(renderer, trackId);

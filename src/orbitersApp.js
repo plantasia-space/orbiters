@@ -442,20 +442,16 @@ voiceRegistry.register(voiceId, {
     themeRoot: designThemeRoot,
 });
 
-// Keep renderer and camera aligned with viewport changes. This is the FULLSCREEN single-orbiter
-// framing (it sizes the renderer to the WINDOW and posts world-size to the host). It belongs ONLY to
-// a voice that OWNS its renderer; a shared-renderer voice is sized/framed per-cell by the
-// ViewportCompositor, so running this would stamp the shared canvas fullscreen and clobber the grid.
+// The window-following bits of the fullscreen single-orbiter shell: the nav viewport state and the
+// world-size message to the host. Renderer size and camera aspect are NOT here — `worldController`
+// owns those and fits them to the canvas box (which edit mode's sheet makes smaller than the window).
+// This belongs ONLY to a voice that OWNS its renderer; a shared-renderer voice is sized/framed
+// per-cell by the ViewportCompositor, and its host must not be told a fullscreen world size.
 // (Gated on `!sharedRenderer`, NOT `mountChrome` — multi tiles now mount chrome but must not reframe.)
 if (!sharedRenderer) {
     bindViewportHandlers({
         renderer,
-        camera,
         getTrackId: () => dataManager.activeConfigRequest?.trackId ?? null,
-        maxDevicePixelRatio: INITIAL_GRAPHICS_PROFILE.maxDevicePixelRatio,
-        // Subtract the Studio panel inset so resize reframes the SAME left region the controller does —
-        // otherwise this handler resizes to the full tab and the orbiter recenters under the panel.
-        getViewportInset: () => worldController.viewportInsetRight,
     });
 }
 
