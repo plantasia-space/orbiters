@@ -8,6 +8,8 @@ Built with [Three.js](https://threejs.org/), [Tone.js](https://tonejs.github.io/
   <img src="docs/orbiter-world-cards.gif" alt="An orbiter session — a world render with the cards drawer open to switch what plays" />
 </p>
 
+[DEMO PLAY MODE](https://orbiter.plantasia.space/) & [DEMO EDIT MODE](https://orbiter.plantasia.space/?mode=edit)
+
 ## Requirements
 
 - Node.js `>=20.19`
